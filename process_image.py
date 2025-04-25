@@ -85,7 +85,7 @@ def main():
     
     try:
         # Use relative paths for the executable and files
-        seamcarving_exe = "seamcarvinghybrid2.exe"
+        seamcarving_exe = "seam_carving_cuda.exe"
         temp_ppm_rel = os.path.relpath(temp_ppm, current_dir)
         output_ppm_rel = os.path.relpath(output_ppm_base, current_dir)
         
@@ -104,19 +104,23 @@ def main():
         print(f"Output files created in temp directory:")
         print(f"- {output_base}_host.pnm")
         print(f"- {output_base}_device.pnm")
+        print(f"- {output_base}_openmp.pnm")
 
         # Convert PPM files to JPG and move to output directory
         print("\nConverting results to JPG format...")
-        host_ppm = os.path.join(temp_dir, f"{output_base}_host.pnm")
-        device_ppm = os.path.join(temp_dir, f"{output_base}_device.pnm")
-        
-        host_jpg = os.path.join(output_dir, f"{output_base}_host.jpg")
-        device_jpg = os.path.join(output_dir, f"{output_base}_device.jpg")
+        host_ppm = os.path.join(temp_dir, f"{output_base}_device.pnm")
+        host_jpg = os.path.join(output_dir, f"{output_base}_cuda.jpg")
+        device_ppm = os.path.join(temp_dir, f"{output_base}_host.pnm")
+        device_jpg = os.path.join(output_dir, f"{output_base}_seq.jpg")
+        omp_ppm = os.path.join(temp_dir, f"{output_base}_openmp.pnm")
+        omp_jpg = os.path.join(output_dir, f"{output_base}_openmp.jpg")
         
         if convert_ppm_to_jpg(host_ppm, host_jpg):
             print(f"Created: {host_jpg}")
         if convert_ppm_to_jpg(device_ppm, device_jpg):
             print(f"Created: {device_jpg}")
+        if convert_ppm_to_jpg(omp_ppm, omp_jpg):
+            print(f"Created: {omp_jpg}")
             
     except subprocess.CalledProcessError as e:
         print(f"Error running seam carving: {e}")
