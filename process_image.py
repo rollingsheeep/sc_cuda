@@ -85,7 +85,7 @@ def main():
     
     try:
         # Use relative paths for the executable and files
-        seamcarving_exe = "seamcarving.exe"
+        seamcarving_exe = "seamcarvinghybrid2.exe"
         temp_ppm_rel = os.path.relpath(temp_ppm, current_dir)
         output_ppm_rel = os.path.relpath(output_ppm_base, current_dir)
         

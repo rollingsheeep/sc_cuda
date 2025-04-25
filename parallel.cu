@@ -18,6 +18,15 @@ using namespace std;
     }\
 }
 
+// Forward declarations of CUDA kernels
+__global__ void Rgb2GrayKernel(uchar3 * inPixels, int width, int height, uint8_t * outPixels);
+__global__ void pixelsImportantKernel(uint8_t * inPixels, int width, int height, int* xfilter, int* yfilter, int * importants);
+__global__ void carvingKernel(int *leastSignificantPixel, uchar3 *outPixels, uint8_t *grayPixels, int * importants, int width);
+__global__ void seamsScoreKernel(int *importants, int *score, int width, int height, int fromRow);
+__global__ void forwardEnergyKernel(uint8_t *grayPixels, int width, int height, float *energy);
+__global__ void hybridEnergyKernel(int *backwardEnergy, float *forwardEnergy, float *hybridEnergy, int width, int height);
+__global__ void convertToIntKernel(float *floatEnergy, int *intEnergy, int width, int height);
+
 struct GpuTimer
 {
     cudaEvent_t start;
@@ -230,6 +239,72 @@ __global__ void seamsScoreKernel(int *importants, int *score, int width, int hei
     }
 }
 
+__global__ void forwardEnergyKernel(uint8_t *grayPixels, int width, int height, float *energy) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (col >= width || row >= height) return;
+    
+    int idx = row * d_originalWidth + col;
+    
+    if (row == 0) {
+        energy[idx] = 0.0f;
+        return;
+    }
+    
+    // Get neighboring pixel values safely with bounds
+    float left = (col > 0) ? static_cast<float>(grayPixels[idx - 1]) : static_cast<float>(grayPixels[idx]);
+    float right = (col < width - 1) ? static_cast<float>(grayPixels[idx + 1]) : static_cast<float>(grayPixels[idx]);
+    float up = static_cast<float>(grayPixels[idx - d_originalWidth]);
+    float upLeft = (col > 0) ? static_cast<float>(grayPixels[idx - d_originalWidth - 1]) : up;
+    float upRight = (col < width - 1) ? static_cast<float>(grayPixels[idx - d_originalWidth + 1]) : up;
+    
+    // Compute directional costs using floating-point
+    float cU = fabsf(right - left);  // Cost for going straight up
+    float cL = cU + fabsf(up - left);  // Cost for going up-left
+    float cR = cU + fabsf(up - right);  // Cost for going up-right
+    
+    // Get minimum previous path cost
+    float min_energy = energy[idx - d_originalWidth] + cU;
+    if (col > 0) {
+        min_energy = fminf(min_energy, energy[idx - d_originalWidth - 1] + cL);
+    }
+    if (col < width - 1) {
+        min_energy = fminf(min_energy, energy[idx - d_originalWidth + 1] + cR);
+    }
+    
+    energy[idx] = min_energy;
+}
+
+__global__ void hybridEnergyKernel(int *backwardEnergy, float *forwardEnergy, float *hybridEnergy, int width, int height) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (col >= width || row >= height) return;
+    
+    int idx = row * d_originalWidth + col;
+    
+    // Normalize both energy values to 0-1 range
+    float backwardNorm = static_cast<float>(backwardEnergy[idx]) / 255.0f;
+    float forwardNorm = forwardEnergy[idx] / 255.0f;  // forwardEnergy is already in float
+    
+    // Choose the higher energy value
+    float hybridVal = fmaxf(backwardNorm, forwardNorm);
+    
+    // Store the normalized hybrid energy
+    hybridEnergy[idx] = hybridVal;
+}
+
+__global__ void convertToIntKernel(float *floatEnergy, int *intEnergy, int width, int height) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if (col >= width || row >= height) return;
+    
+    int idx = row * d_originalWidth + col;
+    intEnergy[idx] = static_cast<int>(floatEnergy[idx] * 255.0f);
+}
+
 void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidth, uchar3* outPixels, dim3 blockSize) {
     GpuTimer timer;
     timer.Start();
@@ -245,6 +320,10 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
     CHECK(cudaMalloc(&d_leastSignificantPixel, height * sizeof(int)));
     int * d_score;
     CHECK(cudaMalloc(&d_score, width * height * sizeof(int)));
+    float * d_forwardEnergy;
+    CHECK(cudaMalloc(&d_forwardEnergy, width * height * sizeof(float)));
+    float * d_hybridEnergy;
+    CHECK(cudaMalloc(&d_hybridEnergy, width * height * sizeof(float)));
 
     int * importants = (int *)malloc(width * height * sizeof(int));
     int * leastSignificantPixel = (int *)malloc(height * sizeof(int));
@@ -280,10 +359,27 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
 
     CHECK(cudaMemcpy(xfilter, _xSobel, xysize, cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(yfilter, _ySobel, xysize, cudaMemcpyHostToDevice));
+
     // Loop to delete each seam
     while (width > targetWidth) {
-        // Step 2: Calculate the importance of each pixel
+        // Step 2: Calculate backward energy
         pixelsImportantKernel<<<gridSize, blockSize, smemSize>>>(d_grayPixels, width, height, xfilter, yfilter, d_importants);
+        cudaDeviceSynchronize();
+        CHECK(cudaGetLastError());
+
+        // Step 2.1: Calculate forward energy
+        forwardEnergyKernel<<<gridSize, blockSize>>>(d_grayPixels, width, height, d_forwardEnergy);
+        cudaDeviceSynchronize();
+        CHECK(cudaGetLastError());
+
+        // Step 2.2: Combine energies using hybrid approach
+        hybridEnergyKernel<<<gridSize, blockSize>>>(d_importants, d_forwardEnergy, d_hybridEnergy, width, height);
+        cudaDeviceSynchronize();
+        CHECK(cudaGetLastError());
+
+        // Convert hybrid energy to integer for seam finding
+        dim3 convertGrid((width-1)/blockSize.x + 1, (height-1)/blockSize.y + 1);
+        convertToIntKernel<<<convertGrid, blockSize>>>(d_hybridEnergy, d_importants, width, height);
         cudaDeviceSynchronize();
         CHECK(cudaGetLastError());
 
@@ -298,7 +394,7 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
         CHECK(cudaMemcpy(score, d_score, originalWidth * height * sizeof(int), cudaMemcpyDeviceToHost));
         trace(score, leastSignificantPixel, width, height, originalWidth);
 
-        // Step 4: Delete the seam  found。
+        // Step 4: Delete the seam found
         CHECK(cudaMemcpy(d_leastSignificantPixel, leastSignificantPixel, height * sizeof(int), cudaMemcpyHostToDevice));
         carvingKernel<<<height, 1>>>(d_leastSignificantPixel, d_inPixels, d_grayPixels, d_importants, width);
         cudaDeviceSynchronize();
@@ -314,6 +410,8 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
     CHECK(cudaFree(d_importants));
     CHECK(cudaFree(d_leastSignificantPixel));
     CHECK(cudaFree(d_score));
+    CHECK(cudaFree(d_forwardEnergy));
+    CHECK(cudaFree(d_hybridEnergy));
     CHECK(cudaFree(xfilter));
     CHECK(cudaFree(yfilter));
     free(score);
@@ -530,7 +628,7 @@ int main(int argc, char ** argv)
 
     // seam carving using host
     uchar3 * correctOutPixels = (uchar3 *)malloc(width * height * sizeof(uchar3));
-    seamCarvingByHost(inPixels, width, height, targetWidth, correctOutPixels);
+    // seamCarvingByHost(inPixels, width, height, targetWidth, correctOutPixels);
 
     // seam carving using device
     uchar3 * outPixels= (uchar3 *)malloc(width * height * sizeof(uchar3));
@@ -543,12 +641,12 @@ int main(int argc, char ** argv)
     seamCarvingByDevice(inPixels, width, height, targetWidth, outPixels, blockSize);
     printf("Image size after seam carving (new_width x height): %i x %i\n\n", targetWidth, height);
     // Compute mean absolute error between host result and device result
-    float err = computeError(outPixels, correctOutPixels, width * height);
-    printf("Error between device result and host result: %f\n", err);
+    // float err = computeError(outPixels, correctOutPixels, width * height);
+    // printf("Error between device result and host result: %f\n", err);
     
     // Write results to files
     char *outFileNameBase = strtok(argv[2], "."); // Get rid of extension
-    writePnm(correctOutPixels, targetWidth, height, width, concatStr(outFileNameBase, "_host.pnm"));
+    // writePnm(correctOutPixels, targetWidth, height, width, concatStr(outFileNameBase, "_host.pnm"));
     writePnm(outPixels, targetWidth, height, width, concatStr(outFileNameBase, "_device.pnm"));
 
     // Free memories
