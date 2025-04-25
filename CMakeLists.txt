@@ -11,8 +11,9 @@ if(MSVC)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MD")
 endif()
 
-# Find CUDA
+# Find required packages
 find_package(CUDA REQUIRED)
+find_package(MPI REQUIRED)
 
 # Create a library for common code
 add_library(common_lib STATIC

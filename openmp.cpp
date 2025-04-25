@@ -309,7 +309,7 @@ int main(int argc, char ** argv)
     
     // Write results to files
     char *outFileNameBase = strtok(argv[2], "."); // Get rid of extension
-    writePnm(outPixels, targetWidth, height, width, concatStr(outFileNameBase, "_openmp.pnm"));
+    writePnm(outPixels, targetWidth, height, width, concatStr(outFileNameBase, "_omp.pnm"));
 
     // Free memories
     free(inPixels);

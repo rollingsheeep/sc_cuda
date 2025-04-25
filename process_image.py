@@ -49,6 +49,35 @@ def convert_ppm_to_jpg(ppm_path, jpg_path):
         print(f"Error converting PPM to JPG: {e}")
         return False
 
+def run_seam_carving(executable, input_file, output_base, num_seams):
+    """Run seam carving with appropriate command based on executable type"""
+    try:
+        if "mpi" in executable.lower():
+            # Use mpiexec for MPI version with 4 processes
+            cmd = [
+                "mpiexec",
+                "-n", "4",  # Use 4 processes
+                executable,
+                input_file,
+                output_base,
+                num_seams
+            ]
+        else:
+            # Regular execution for non-MPI versions
+            cmd = [
+                executable,
+                input_file,
+                output_base,
+                num_seams
+            ]
+        
+        print(f"Running command: {' '.join(cmd)}")
+        subprocess.run(cmd, check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error running seam carving: {e}")
+        return False
+
 def main():
     if len(sys.argv) != 4:
         print("Usage: python process_image.py input.jpg output_base_name number_of_seams")
@@ -78,63 +107,44 @@ def main():
     if not convert_jpg_to_ppm(input_jpg, temp_ppm):
         sys.exit(1)
 
-    # Run seam carving
-    output_ppm_base = os.path.join(temp_dir, output_base)
-    print(f"\nRunning seam carving...")
-    print(f"Output PPM base: {output_ppm_base}")
-    
-    try:
-        # Use relative paths for the executable and files
-        seamcarving_exe = "seam_carving_cuda.exe"
-        temp_ppm_rel = os.path.relpath(temp_ppm, current_dir)
-        output_ppm_rel = os.path.relpath(output_ppm_base, current_dir)
-        
-        print(f"Seam carving executable: {seamcarving_exe}")
-        print(f"Command: {seamcarving_exe} {temp_ppm_rel} {output_ppm_rel} {num_seams}")
-        
-        # Run the command with the current directory as working directory
-        subprocess.run([
-            seamcarving_exe,
-            temp_ppm_rel,
-            output_ppm_rel,
-            num_seams
-        ], check=True, cwd=current_dir)
-        
-        print("\nSeam carving completed successfully!")
-        print(f"Output files created in temp directory:")
-        print(f"- {output_base}_host.pnm")
-        print(f"- {output_base}_device.pnm")
-        print(f"- {output_base}_openmp.pnm")
+    # Run seam carving for each version
+    executables = [
+        "seam_carving_seq.exe",
+        "seam_carving_omp.exe",
+        "seam_carving_cuda.exe"
+    ]
 
-        # Convert PPM files to JPG and move to output directory
-        print("\nConverting results to JPG format...")
-        host_ppm = os.path.join(temp_dir, f"{output_base}_device.pnm")
-        host_jpg = os.path.join(output_dir, f"{output_base}_cuda.jpg")
-        device_ppm = os.path.join(temp_dir, f"{output_base}_host.pnm")
-        device_jpg = os.path.join(output_dir, f"{output_base}_seq.jpg")
-        omp_ppm = os.path.join(temp_dir, f"{output_base}_openmp.pnm")
-        omp_jpg = os.path.join(output_dir, f"{output_base}_openmp.jpg")
+    for exe in executables:
+        if not os.path.exists(exe):
+            print(f"Warning: {exe} not found, skipping...")
+            continue
+
+        print(f"\nRunning {exe}...")
+        output_ppm_base = os.path.join(temp_dir, output_base)
+        if not run_seam_carving(exe, temp_ppm, output_ppm_base, num_seams):
+            print(f"Failed to run {exe}")
+            continue
+
+        # Convert output to JPG
+        suffix = exe.replace("seam_carving_", "").replace(".exe", "")
+        output_ppm = os.path.join(temp_dir, f"{output_base}_{suffix}.pnm")
+        output_jpg = os.path.join(output_dir, f"{output_base}_{suffix}.jpg")
         
-        if convert_ppm_to_jpg(host_ppm, host_jpg):
-            print(f"Created: {host_jpg}")
-        if convert_ppm_to_jpg(device_ppm, device_jpg):
-            print(f"Created: {device_jpg}")
-        if convert_ppm_to_jpg(omp_ppm, omp_jpg):
-            print(f"Created: {omp_jpg}")
-            
-    except subprocess.CalledProcessError as e:
-        print(f"Error running seam carving: {e}")
-        # Print the contents of the temp directory to help debug
-        print("\nContents of temp directory:")
-        for file in os.listdir(temp_dir):
-            print(f"- {file}")
-    finally:
-        # Clean up temporary files
-        for file in os.listdir(temp_dir):
-            if file.endswith('.pnm'):
-                temp_file = os.path.join(temp_dir, file)
-                os.remove(temp_file)
-                print(f"Cleaned up temporary file: {temp_file}")
+        if os.path.exists(output_ppm):
+            if convert_ppm_to_jpg(output_ppm, output_jpg):
+                print(f"Created: {output_jpg}")
+            else:
+                print(f"Failed to convert {output_ppm} to JPG")
+        else:
+            print(f"Warning: Output file {output_ppm} not found")
+
+    # Clean up temporary files
+    print("\nCleaning up temporary files...")
+    for file in os.listdir(temp_dir):
+        if file.endswith('.pnm'):
+            temp_file = os.path.join(temp_dir, file)
+            os.remove(temp_file)
+            print(f"Removed: {temp_file}")
 
 if __name__ == "__main__":
     main() 
