@@ -109,9 +109,10 @@ def main():
 
     # Run seam carving for each version
     executables = [
-        "seam_carving_seq.exe",
-        "seam_carving_omp.exe",
-        "seam_carving_cuda.exe"
+        # "seam_carving_seq.exe",
+        # "seam_carving_omp.exe",
+        "seam_carving_cuda.exe",
+        # "seam_carving_mpi.exe"
     ]
 
     for exe in executables:

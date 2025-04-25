@@ -39,6 +39,12 @@ else()
 endif()
 target_link_libraries(seam_carving_omp common_lib)
 
+# MPI version
+add_executable(seam_carving_mpi
+    mpi.cpp
+)
+target_link_libraries(seam_carving_mpi common_lib MPI::MPI_CXX)
+
 # CUDA version
 cuda_add_executable(seam_carving_cuda
     cuda.cu
@@ -57,7 +63,7 @@ else()
 endif()
 
 # Installation
-install(TARGETS seam_carving_seq seam_carving_omp seam_carving_cuda common_lib
+install(TARGETS seam_carving_seq seam_carving_omp seam_carving_mpi seam_carving_cuda common_lib
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
