@@ -213,7 +213,6 @@ void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth,
     double totalHybridEnergyTime = 0.0;
     double totalDpTime = 0.0;
     double totalSeamTracingTime = 0.0;
-    double totalLocalUpdateTime = 0.0;
 
     memcpy(outPixels, inPixels, width * height * sizeof(uchar3));
     const int originalWidth = width;
@@ -286,22 +285,25 @@ void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth,
 
             if (r < height - 1) {
                 // Local update of importance map
-                auto localUpdateStart = std::chrono::high_resolution_clock::now();
+                // Update importance values for pixels in a 5-pixel window around the previous seam
+                // This is an optimization to only recompute importance for affected pixels
                 for (int affectedCol = max(0, prevMinCol - 2); affectedCol <= prevMinCol + 2 && affectedCol < width - 1; ++affectedCol) {
                     importants[(r + 1) * originalWidth + affectedCol] = pixelsImportant(grayPixels, r + 1, affectedCol, width - 1, height, originalWidth);
                 }
-                auto localUpdateEnd = std::chrono::high_resolution_clock::now();
-                totalLocalUpdateTime += std::chrono::duration_cast<std::chrono::microseconds>(localUpdateEnd - localUpdateStart).count() / 1000.0;
             }
 
             if (r > 0) {
+                // Store current seam position for next iteration's local update
                 prevMinCol = minCol;
+                // Find the next pixel in the seam by looking at the three possible paths above
                 int aboveIdx = (r - 1) * originalWidth + minCol;
                 int min = score[aboveIdx], minColCpy = minCol;
+                // Check left diagonal path
                 if (minColCpy > 0 && score[aboveIdx - 1] < min) {
                     min = score[aboveIdx - 1];
                     minCol = minColCpy - 1;
                 }
+                // Check right diagonal path
                 if (minColCpy < width - 1 && score[aboveIdx + 1] < min) {
                     minCol = minColCpy + 1;
                 }
@@ -316,7 +318,6 @@ void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth,
             importants[affectedCol] = pixelsImportant(grayPixels, 0, affectedCol, width - 1, height, originalWidth);
         }
         auto firstRowUpdateEnd = std::chrono::high_resolution_clock::now();
-        totalLocalUpdateTime += std::chrono::duration_cast<std::chrono::microseconds>(firstRowUpdateEnd - firstRowUpdateStart).count() / 1000.0;
 
         --width;
     }
@@ -341,7 +342,6 @@ void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth,
     printf("Hybrid energy: %.2f ms\n", totalHybridEnergyTime);
     printf("Dynamic programming: %.2f ms\n", totalDpTime);
     printf("Seam tracing and removal: %.2f ms\n", totalSeamTracingTime);
-    printf("Local importance map updates: %.2f ms\n", totalLocalUpdateTime);
     printf("---------------------------------\n");
     printf("Total seam carving time: %.2f ms\n\n", totalTime);
 }

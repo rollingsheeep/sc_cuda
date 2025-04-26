@@ -1,0 +1,352 @@
+[
+    {
+        "Image": "100.pnm",
+        "Width": 100,
+        "Num_Seams": 25,
+        "Average Time (s)": 0.1367638111114502,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "200.pnm",
+        "Width": 200,
+        "Num_Seams": 50,
+        "Average Time (s)": 0.15411615371704102,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "300.pnm",
+        "Width": 300,
+        "Num_Seams": 75,
+        "Average Time (s)": 0.1703929901123047,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "320.pnm",
+        "Width": 320,
+        "Num_Seams": 80,
+        "Average Time (s)": 0.19268131256103516,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "340.pnm",
+        "Width": 340,
+        "Num_Seams": 85,
+        "Average Time (s)": 0.20087385177612305,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "400.pnm",
+        "Width": 400,
+        "Num_Seams": 100,
+        "Average Time (s)": 0.2253584861755371,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "404.pnm",
+        "Width": 404,
+        "Num_Seams": 101,
+        "Average Time (s)": 0.22624564170837402,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "440.pnm",
+        "Width": 440,
+        "Num_Seams": 110,
+        "Average Time (s)": 0.23712491989135742,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "480.pnm",
+        "Width": 480,
+        "Num_Seams": 120,
+        "Average Time (s)": 0.23618268966674805,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "500.pnm",
+        "Width": 500,
+        "Num_Seams": 125,
+        "Average Time (s)": 0.29162049293518066,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "504.pnm",
+        "Width": 504,
+        "Num_Seams": 126,
+        "Average Time (s)": 0.2878432273864746,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "512.pnm",
+        "Width": 512,
+        "Num_Seams": 128,
+        "Average Time (s)": 0.2992079257965088,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "520.pnm",
+        "Width": 520,
+        "Num_Seams": 130,
+        "Average Time (s)": 0.28997015953063965,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "540.pnm",
+        "Width": 540,
+        "Num_Seams": 135,
+        "Average Time (s)": 0.3076753616333008,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "580.pnm",
+        "Width": 580,
+        "Num_Seams": 145,
+        "Average Time (s)": 0.36009860038757324,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "600.pnm",
+        "Width": 600,
+        "Num_Seams": 150,
+        "Average Time (s)": 0.3692495822906494,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "604.pnm",
+        "Width": 604,
+        "Num_Seams": 151,
+        "Average Time (s)": 0.37758755683898926,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "606.pnm",
+        "Width": 606,
+        "Num_Seams": 151,
+        "Average Time (s)": 0.3783712387084961,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "608.pnm",
+        "Width": 608,
+        "Num_Seams": 152,
+        "Average Time (s)": 0.37974023818969727,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "620.pnm",
+        "Width": 620,
+        "Num_Seams": 155,
+        "Average Time (s)": 0.39234447479248047,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "640.pnm",
+        "Width": 640,
+        "Num_Seams": 160,
+        "Average Time (s)": 0.4018738269805908,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "654.pnm",
+        "Width": 654,
+        "Num_Seams": 163,
+        "Average Time (s)": 0.41446781158447266,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "700.pnm",
+        "Width": 700,
+        "Num_Seams": 175,
+        "Average Time (s)": 0.4905247688293457,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "728.pnm",
+        "Width": 728,
+        "Num_Seams": 182,
+        "Average Time (s)": 0.4275779724121094,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "800.pnm",
+        "Width": 800,
+        "Num_Seams": 200,
+        "Average Time (s)": 0.5332677364349365,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "920.pnm",
+        "Width": 920,
+        "Num_Seams": 230,
+        "Average Time (s)": 0.8365504741668701,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "960.pnm",
+        "Width": 960,
+        "Num_Seams": 240,
+        "Average Time (s)": 0.8051702976226807,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "980.pnm",
+        "Width": 980,
+        "Num_Seams": 245,
+        "Average Time (s)": 0.963763952255249,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1000.pnm",
+        "Width": 1000,
+        "Num_Seams": 250,
+        "Average Time (s)": 0.7827401161193848,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1040.pnm",
+        "Width": 1040,
+        "Num_Seams": 260,
+        "Average Time (s)": 1.0137431621551514,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1082.pnm",
+        "Width": 1082,
+        "Num_Seams": 270,
+        "Average Time (s)": 0.6478409767150879,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1100.pnm",
+        "Width": 1100,
+        "Num_Seams": 275,
+        "Average Time (s)": 1.06331205368042,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1140.pnm",
+        "Width": 1140,
+        "Num_Seams": 285,
+        "Average Time (s)": 1.0421648025512695,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1160.pnm",
+        "Width": 1160,
+        "Num_Seams": 290,
+        "Average Time (s)": 1.2450580596923828,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1200.pnm",
+        "Width": 1200,
+        "Num_Seams": 300,
+        "Average Time (s)": 1.5148887634277344,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1240.pnm",
+        "Width": 1240,
+        "Num_Seams": 310,
+        "Average Time (s)": 1.2620725631713867,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1280.pnm",
+        "Width": 1280,
+        "Num_Seams": 320,
+        "Average Time (s)": 1.5121369361877441,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1428.pnm",
+        "Width": 1428,
+        "Num_Seams": 357,
+        "Average Time (s)": 1.9731779098510742,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1440.pnm",
+        "Width": 1440,
+        "Num_Seams": 360,
+        "Average Time (s)": 2.0950262546539307,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1616.pnm",
+        "Width": 1616,
+        "Num_Seams": 404,
+        "Average Time (s)": 2.4048659801483154,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1760.pnm",
+        "Width": 1760,
+        "Num_Seams": 440,
+        "Average Time (s)": 2.6675496101379395,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1900.pnm",
+        "Width": 1900,
+        "Num_Seams": 475,
+        "Average Time (s)": 2.8518474102020264,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "1920.pnm",
+        "Width": 1920,
+        "Num_Seams": 480,
+        "Average Time (s)": 2.8989596366882324,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "2000.pnm",
+        "Width": 2000,
+        "Num_Seams": 500,
+        "Average Time (s)": 4.106201887130737,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "2120.pnm",
+        "Width": 2120,
+        "Num_Seams": 530,
+        "Average Time (s)": 5.088798522949219,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "2200.pnm",
+        "Width": 2200,
+        "Num_Seams": 550,
+        "Average Time (s)": 5.271793603897095,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "2600.pnm",
+        "Width": 2600,
+        "Num_Seams": 650,
+        "Average Time (s)": 2.710602045059204,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "2880.pnm",
+        "Width": 2880,
+        "Num_Seams": 720,
+        "Average Time (s)": 8.647953033447266,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "3000.pnm",
+        "Width": 3000,
+        "Num_Seams": 750,
+        "Average Time (s)": 12.083138942718506,
+        "Std Dev (s)": 0.0
+    },
+    {
+        "Image": "3056.pnm",
+        "Width": 3056,
+        "Num_Seams": 764,
+        "Average Time (s)": 13.60374116897583,
+        "Std Dev (s)": 0.0
+    }
+]

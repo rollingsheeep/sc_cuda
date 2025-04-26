@@ -62,6 +62,8 @@ void forwardEnergy(uint8_t *grayPixels, int width, int height, float *energy, in
     for (int c = 0; c < width; ++c) {
         energy[c] = 0.0f;
     }
+
+    
     for (int r = 1; r < height; ++r) {
         for (int c = 0; c < width; ++c) {
             int idx = r * originalWidth + c;
@@ -250,7 +252,6 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
     double totalHybridEnergyTime = 0.0;
     double totalDpTime = 0.0;
     double totalSeamTracingTime = 0.0;
-    double totalLocalUpdateTime = 0.0;
     auto totalStart = std::chrono::high_resolution_clock::now();
 
     const int originalWidth = width;
@@ -347,7 +348,6 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
                 if (score[(height - 1) * originalWidth + c] < score[(height - 1) * originalWidth + minCol])
                     minCol = c;
             }
-
             // Remove seam
             for (int r = height - 1; r >= 0; --r) {
                 for (int c = minCol; c < width - 1; ++c) {
@@ -367,7 +367,7 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
                         minCol = minColCpy + 1;
                     }
                 }
-            }
+            }      
             auto seamTracingEnd = std::chrono::high_resolution_clock::now();
             totalSeamTracingTime += std::chrono::duration_cast<std::chrono::microseconds>(seamTracingEnd - seamTracingStart).count() / 1000.0;
         }
@@ -405,7 +405,6 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
         printf("Hybrid energy: %.2f ms\n", totalHybridEnergyTime);
         printf("Dynamic programming: %.2f ms\n", totalDpTime);
         printf("Seam tracing and removal: %.2f ms\n", totalSeamTracingTime);
-        printf("Local importance map updates: %.2f ms\n", totalLocalUpdateTime);
         printf("---------------------------------\n");
         printf("Total seam carving time: %.2f ms\n\n", totalTime);
     }

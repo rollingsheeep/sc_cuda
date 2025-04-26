@@ -404,7 +404,6 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
     double totalHybridEnergyTime = 0.0;
     double totalDpTime = 0.0;
     double totalSeamTracingTime = 0.0;
-    double totalLocalUpdateTime = 0.0;
 
     // Memory allocation
     uchar3 *d_inPixels;
@@ -510,13 +509,10 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
         totalSeamTracingTime += std::chrono::duration_cast<std::chrono::microseconds>(seamTracingEnd - seamTracingStart).count() / 1000.0;
 
         // Step 4: Delete the seam found
-        auto localUpdateStart = std::chrono::high_resolution_clock::now();
         CHECK(cudaMemcpy(d_leastSignificantPixel, leastSignificantPixel, height * sizeof(int), cudaMemcpyHostToDevice));
         carvingKernel<<<height, 1>>>(d_leastSignificantPixel, d_inPixels, d_grayPixels, d_importants, width);
         cudaDeviceSynchronize();
         CHECK(cudaGetLastError());
-        auto localUpdateEnd = std::chrono::high_resolution_clock::now();
-        totalLocalUpdateTime += std::chrono::duration_cast<std::chrono::microseconds>(localUpdateEnd - localUpdateStart).count() / 1000.0;
         
         --width;
     }
@@ -550,150 +546,9 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
     printf("Hybrid energy: %.2f ms\n", totalHybridEnergyTime);
     printf("Dynamic programming: %.2f ms\n", totalDpTime);
     printf("Seam tracing and removal: %.2f ms\n", totalSeamTracingTime);
-    printf("Local importance map updates: %.2f ms\n", totalLocalUpdateTime);
     printf("---------------------------------\n");
     printf("Total seam carving time: %.2f ms\n\n", totalTime);
 }
-
-// uint8_t getClosest(uint8_t *pixels, int r, int c, int width, int height, int originalWidth)
-// {
-//     if (r < 0) {
-//         r = 0;
-//     } else if (r >= height) {
-//         r = height - 1;
-//     }
-
-//     if (c < 0) {
-//         c = 0;
-//     } else if (c >= width) {
-//         c = width - 1;
-//     }
-
-//     return pixels[r * originalWidth + c];
-// }
-
-// int pixelsImportant(uint8_t * grayPixels, int row, int col, int width, int height, int originalWidth) {
-//     int x = 0, y = 0;
-//     for (int i = 0; i < 3; ++i) {
-//         for (int j = 0; j < 3; ++j) {
-//             uint8_t closest = getClosest(grayPixels, row - 1 + i, col - 1 + j, width, height, originalWidth);
-//             x += closest * xSobel[i][j];
-//             y += closest * ySobel[i][j];
-//         }
-//     }
-//     return abs(x) + abs(y);
-// }
-
-// void RGB2Gray(uchar3 * inPixels, int width, int height, uint8_t * outPixels) {
-//     for (int r = 0; r < height; ++r) {
-//         for (int c = 0; c < width; ++c) {
-//             int i = r * width + c;
-//             outPixels[i] = 0.299f * inPixels[i].x + 0.587f * inPixels[i].y + 0.114f * inPixels[i].z;
-//         }
-//     }
-// }
-
-// void seamsScore(int *importants, int *score, int width, int height, int originalWidth) {
-//     for (int c = 0; c < width; ++c) {
-//         score[c] = importants[c];
-//     }
-//     for (int r = 1; r < height; ++r) {
-//         for (int c = 0; c < width; ++c) {
-//             int idx = r * originalWidth + c;
-//             int aboveIdx = (r - 1) * originalWidth + c;
-
-//             int min = score[aboveIdx];
-//             if (c > 0 && score[aboveIdx - 1] < min) {
-//                 min = score[aboveIdx - 1];
-//             }
-//             if (c < width - 1 && score[aboveIdx + 1] < min) {
-//                 min = score[aboveIdx + 1];
-//             }
-
-//             score[idx] = min + importants[idx];
-//         }
-//     }
-// }
-
-// void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth, uchar3* outPixels) {
-//     GpuTimer timer;
-//     timer.Start();
-
-//     memcpy(outPixels, inPixels, width * height * sizeof(uchar3));
-
-//     const int originalWidth = width;
-
-//     // allocate memory
-//     int *importants = (int *)malloc(width * height * sizeof(int));
-//     int *score = (int *)malloc(width * height * sizeof(int));
-//     uint8_t *grayPixels= (uint8_t *)malloc(width * height * sizeof(uint8_t));
-    
-//     // Convert to grayscale image
-//     RGB2Gray(inPixels, width, height, grayPixels);
-
-//     // Calculate pixel importance
-//     for (int r = 0; r < height; ++r) {
-//         for (int c = 0; c < width; ++c) {
-//             importants[r * originalWidth + c] = pixelsImportant(grayPixels, r, c, width, height, width);
-//         }
-//     }
-
-//     while (width > targetWidth) {
-//         seamsScore(importants, score, width, height, originalWidth);
-
-//         // find where seam starts
-//         int minCol = 0, r = height - 1, prevMinCol;
-//         for (int c = 1; c < width; ++c) {
-//             if (score[r * originalWidth + c] < score[r * originalWidth + minCol])
-//                 minCol = c;
-//         }
-
-//         // trace and remove seams
-//         for (; r >= 0; --r) {
-//             for (int i = minCol; i < width - 1; ++i) {
-//                 outPixels[r * originalWidth + i] = outPixels[r * originalWidth + i + 1];
-//                 grayPixels[r * originalWidth + i] = grayPixels[r * originalWidth + i + 1];
-//                 importants[r * originalWidth + i] = importants[r * originalWidth + i + 1];
-//             }
-
-            
-//             if (r < height - 1) {
-//                 for (int affectedCol = max(0, prevMinCol - 2); affectedCol <= prevMinCol + 2 && affectedCol < width - 1; ++affectedCol) {
-//                     importants[(r + 1) * originalWidth + affectedCol] = pixelsImportant(grayPixels, r + 1, affectedCol, width - 1, height, originalWidth);
-//                 }
-//             }
-
-            
-//             if (r > 0) {
-//                 prevMinCol = minCol;
-
-//                 int aboveIdx = (r - 1) * originalWidth + minCol;
-//                 int min = score[aboveIdx], minColCpy = minCol;
-//                 if (minColCpy > 0 && score[aboveIdx - 1] < min) {
-//                     min = score[aboveIdx - 1];
-//                     minCol = minColCpy - 1;
-//                 }
-//                 if (minColCpy < width - 1 && score[aboveIdx + 1] < min) {
-//                     minCol = minColCpy + 1;
-//                 }
-//             }
-//         }
-
-//         for (int affectedCol = max(0, minCol - 2); affectedCol <= minCol + 2 && affectedCol < width - 1; ++affectedCol) {
-//             importants[affectedCol] = pixelsImportant(grayPixels, 0, affectedCol, width - 1, height, originalWidth);
-//         }
-
-//         --width;
-//     }
-    
-//     free(grayPixels);
-//     free(score);
-//     free(importants);
-
-//     timer.Stop();
-//     float time = timer.Elapsed();
-//     printf("Processing time (use host): %f ms\n\n", time);
-// }
 
 float computeError(uchar3 * a1, uchar3 * a2, int n)
 {
@@ -764,10 +619,6 @@ int main(int argc, char ** argv)
 
     int targetWidth = width - numSeamRemoved;
 
-    // seam carving using host
-    // uchar3 * correctOutPixels = (uchar3 *)malloc(width * height * sizeof(uchar3));
-    // seamCarvingByHost(inPixels, width, height, targetWidth, correctOutPixels);
-
     // seam carving using device
     uchar3 * outPixels= (uchar3 *)malloc(width * height * sizeof(uchar3));
     dim3 blockSize(16, 16); // Default
@@ -778,13 +629,9 @@ int main(int argc, char ** argv)
     } 
     seamCarvingByDevice(inPixels, width, height, targetWidth, outPixels, blockSize);
     printf("Image size after seam carving (new_width x height): %i x %i\n\n", targetWidth, height);
-    // Compute mean absolute error between host result and device result
-    // float err = computeError(outPixels, correctOutPixels, width * height);
-    // printf("Error between device result and host result: %f\n", err);
     
     // Write results to files
     char *outFileNameBase = strtok(argv[2], "."); // Get rid of extension
-    // writePnm(correctOutPixels, targetWidth, height, width, concatStr(outFileNameBase, "_host.pnm"));
     writePnm(outPixels, targetWidth, height, width, concatStr(outFileNameBase, "_cuda.pnm"));
 
     // Free memories

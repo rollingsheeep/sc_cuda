@@ -151,7 +151,6 @@ void seamCarvingByOpenMP(uchar3 *inPixels, int width, int height, int targetWidt
     double totalHybridEnergyTime = 0.0;
     double totalDpTime = 0.0;
     double totalSeamTracingTime = 0.0;
-    double totalLocalUpdateTime = 0.0;
 
     memcpy(outPixels, inPixels, width * height * sizeof(uchar3));
     const int originalWidth = width;
@@ -240,7 +239,6 @@ void seamCarvingByOpenMP(uchar3 *inPixels, int width, int height, int targetWidt
         totalSeamTracingTime += std::chrono::duration_cast<std::chrono::microseconds>(seamTracingEnd - seamTracingStart).count() / 1000.0;
 
         // Update importance map
-        auto localUpdateStart = std::chrono::high_resolution_clock::now();
         #pragma omp parallel for
         for (int r = 0; r < height; ++r) {
             for (int c = 0; c < width - 1; ++c) { // width-1 because width not decremented yet
@@ -250,9 +248,6 @@ void seamCarvingByOpenMP(uchar3 *inPixels, int width, int height, int targetWidt
 
         // Update seamsScore after updating importants
         seamsScore(importants, score, width - 1, height, originalWidth);
-        auto localUpdateEnd = std::chrono::high_resolution_clock::now();
-        totalLocalUpdateTime += std::chrono::duration_cast<std::chrono::microseconds>(localUpdateEnd - localUpdateStart).count() / 1000.0;
-
         --width;
     }
     
@@ -276,7 +271,6 @@ void seamCarvingByOpenMP(uchar3 *inPixels, int width, int height, int targetWidt
     printf("Hybrid energy: %.2f ms\n", totalHybridEnergyTime);
     printf("Dynamic programming: %.2f ms\n", totalDpTime);
     printf("Seam tracing and removal: %.2f ms\n", totalSeamTracingTime);
-    printf("Local importance map updates: %.2f ms\n", totalLocalUpdateTime);
     printf("---------------------------------\n");
     printf("Total seam carving time: %.2f ms\n\n", totalTime);
 }

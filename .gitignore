@@ -2,3 +2,8 @@
 *.exe
 *.exp
 *.lib
+# /.venv
+# /inputdata
+# /outputdata
+# /inputdata_temp
+# /outputdata_temp
