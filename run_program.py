@@ -2,6 +2,8 @@ import os
 import sys
 from PIL import Image
 import subprocess
+import re
+from collections import defaultdict
 
 def convert_jpg_to_ppm(jpg_path, ppm_path):
     """Convert JPG image to PPM format"""
@@ -49,6 +51,103 @@ def convert_ppm_to_jpg(ppm_path, jpg_path):
         print(f"Error converting PPM to JPG: {e}")
         return False
 
+def extract_metrics(output):
+    """Extract performance metrics from program output"""
+    metrics = {}
+    current_impl = None
+    
+    # Initialize metrics structure
+    implementation_markers = {
+        'seq': 'Seam Carving Performance Analysis:',
+        'omp': 'OpenMP Implementation Performance Analysis:',
+        'cuda': 'CUDA Implementation Performance Analysis:',
+        'mpi': 'Seam Carving Performance Analysis (MPI):'
+    }
+    
+    lines = output.split('\n')
+    for i, line in enumerate(lines):
+        # Detect implementation type from the analysis header
+        for impl_key, marker in implementation_markers.items():
+            if marker in line:
+                current_impl = impl_key
+                metrics[current_impl] = {}
+                break
+                
+        # Skip if we haven't identified an implementation yet
+        if not current_impl:
+            continue
+            
+        # Extract timing metrics
+        try:
+            # Look for lines with timing information (containing "ms")
+            if ': ' in line and 'ms' in line:
+                parts = line.split(': ')
+                if len(parts) == 2:
+                    metric_name = parts[0].strip()
+                    # Extract the number before "ms"
+                    time_str = parts[1].strip().split()[0]
+                    try:
+                        time_value = float(time_str)
+                        metrics[current_impl][metric_name] = time_value
+                    except ValueError:
+                        print(f"Warning: Could not parse time value from: {time_str}")
+        except Exception as e:
+            print(f"Warning: Could not parse metric from line: {line}")
+            continue
+    
+    # Verify all implementations have required metrics
+    required_metrics = [
+        'Grayscale conversion',
+        'Backward energy (Sobel)',
+        'Forward energy',
+        'Hybrid energy',
+        'Dynamic programming',
+        'Seam tracing and removal',
+        'Total seam carving time'
+    ]
+    
+    # Initialize missing metrics with None
+    for impl in metrics:
+        for metric in required_metrics:
+            if metric not in metrics[impl]:
+                print(f"Warning: Missing metric '{metric}' for implementation '{impl}'")
+                metrics[impl][metric] = None
+    
+    return metrics
+
+def calculate_performance_metrics(metrics, num_seams, image_size):
+    """Calculate throughput and speedup metrics"""
+    results = defaultdict(dict)
+    
+    # Get sequential time as baseline
+    if 'seq' in metrics and metrics['seq'].get('Total seam carving time') is not None:
+        seq_time = metrics['seq']['Total seam carving time']
+    else:
+        print("Warning: Sequential implementation metrics not found or invalid")
+        return results
+    
+    # Calculate metrics for each implementation
+    for impl, data in metrics.items():
+        total_time = data.get('Total seam carving time')
+        if total_time is None:
+            print(f"Warning: Missing total time for {impl} implementation")
+            continue
+            
+        # Calculate throughput (seams/second)
+        throughput = (num_seams * 1000) / total_time  # multiply by 1000 because time is in milliseconds
+        
+        # Calculate speedup relative to sequential
+        speedup = seq_time / total_time
+        
+        # Store results
+        results[impl] = {
+            'Total Time (ms)': total_time,
+            'Throughput (seams/sec)': throughput,
+            'Speedup': speedup
+        }
+    
+    return results
+
 def run_seam_carving(executable, input_file, output_base, num_seams):
     """Run seam carving with appropriate command based on executable type"""
     try:
@@ -72,11 +171,29 @@ def run_seam_carving(executable, input_file, output_base, num_seams):
             ]
         
         print(f"Running command: {' '.join(cmd)}")
-        subprocess.run(cmd, check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
-        return True
+        result = subprocess.run(
+            cmd, 
+            check=True, 
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True,
+            text=True
+        )
+        print(result.stdout)  # Print the output
+        return True, result.stdout
     except subprocess.CalledProcessError as e:
         print(f"Error running seam carving: {e}")
-        return False
+        return False, None
+
+def print_performance_summary(perf_metrics):
+    """Print a formatted performance summary"""
+    print("\nPerformance Summary:")
+    print("-" * 80)
+    print(f"{'Implementation':<15} {'Total Time (ms)':<15} {'Throughput (seams/s)':<20} {'Speedup':<10}")
+    print("-" * 80)
+    
+    for impl, metrics in perf_metrics.items():
+        print(f"{impl:<15} {metrics['Total Time (ms)']:<15.2f} {metrics['Throughput (seams/sec)']:<20.2f} {metrics['Speedup']:<10.2f}")
+    print("-" * 80)
 
 def main():
     if len(sys.argv) != 4:
@@ -90,7 +207,7 @@ def main():
     # Get input file path
     input_jpg = os.path.abspath(sys.argv[1])
     output_base = sys.argv[2]
-    num_seams = sys.argv[3]
+    num_seams = int(sys.argv[3])  # Convert to int here
 
     # Create output and temp directories
     output_dir = os.path.join(current_dir, "output")
@@ -107,45 +224,93 @@ def main():
     if not convert_jpg_to_ppm(input_jpg, temp_ppm):
         sys.exit(1)
 
-    # Run seam carving for each version
-    executables = [
-        "seam_carving_seq.exe",
-        "seam_carving_omp.exe",
-        "seam_carving_cuda.exe",
-        "seam_carving_mpi.exe"
-    ]
+    # Get image dimensions
+    with Image.open(input_jpg) as img:
+        image_size = img.size[0] * img.size[1]  # width * height
 
-    for exe in executables:
-        if not os.path.exists(exe):
-            print(f"Warning: {exe} not found, skipping...")
-            continue
-
-        print(f"\nRunning {exe}...")
-        output_ppm_base = os.path.join(temp_dir, output_base)
-        if not run_seam_carving(exe, temp_ppm, output_ppm_base, num_seams):
-            print(f"Failed to run {exe}")
-            continue
-
-        # Convert output to JPG
-        suffix = exe.replace("seam_carving_", "").replace(".exe", "")
-        output_ppm = os.path.join(temp_dir, f"{output_base}_{suffix}.pnm")
-        output_jpg = os.path.join(output_dir, f"{output_base}_{suffix}.jpg")
+    # Store all output for metric extraction
+    all_output = ""
+    
+    # Process each implementation
+    implementations = ['seq', 'omp', 'cuda', 'mpi']
+    metrics = {}
+    
+    for impl in implementations:
+        print(f"\nProcessing {impl} implementation...")
+        exe_name = f"seam_carving_{impl}.exe"
+        output_ppm = os.path.join(temp_dir, f"{output_base}.pnm")
+        output_jpg = os.path.join(output_dir, f"{output_base}_{impl}.jpg")
+        output_temp = os.path.join(temp_dir, f"{output_base}_{impl}.pnm")
         
-        if os.path.exists(output_ppm):
-            if convert_ppm_to_jpg(output_ppm, output_jpg):
-                print(f"Created: {output_jpg}")
+        try:
+            # Prepare the command based on implementation
+            if impl == 'mpi':
+                cmd = ["mpiexec", "-n", "4", os.path.join(".", exe_name), temp_ppm, output_ppm, str(num_seams)]
             else:
-                print(f"Failed to convert {output_ppm} to JPG")
-        else:
-            print(f"Warning: Output file {output_ppm} not found")
-
-    # Clean up temporary files
-    print("\nCleaning up temporary files...")
-    for file in os.listdir(temp_dir):
-        if file.endswith('.pnm'):
-            temp_file = os.path.join(temp_dir, file)
-            os.remove(temp_file)
-            print(f"Removed: {temp_file}")
+                cmd = [os.path.join(".", exe_name), temp_ppm, output_ppm, str(num_seams)]
+                
+            print(f"Running command: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            # Print the output and any errors
+            if result.stdout:
+                print("Output:")
+                print(result.stdout)
+            if result.stderr:
+                print("Errors:")
+                print(result.stderr)
+            
+            # Extract metrics from the output
+            impl_metrics = extract_metrics(result.stdout)
+            if impl_metrics:
+                metrics[impl] = impl_metrics[impl]
+            
+            # Convert output to JPG if PPM exists
+            if os.path.exists(output_temp):
+                if convert_ppm_to_jpg(output_temp, output_jpg):
+                    print(f"Created: {output_jpg}")
+                    # Clean up the temporary PPM file
+                    os.remove(output_temp)
+                else:
+                    print(f"Failed to convert {output_temp} to JPG")
+            else:
+                print(f"Warning: Output file {output_temp} not found")
+                
+        except Exception as e:
+            print(f"Error running {impl} implementation: {str(e)}")
+            continue
+    
+    # Calculate and display performance metrics
+    if metrics:
+        print("\nPerformance Metrics:")
+        print("-" * 80)
+        perf_metrics = calculate_performance_metrics(metrics, num_seams, image_size)
+        
+        # Display metrics in a table format
+        headers = ['Implementation', 'Total Time (ms)', 'Throughput (seams/sec)', 'Speedup']
+        row_format = "{:<15} {:<20} {:<25} {:<15}"
+        
+        print(row_format.format(*headers))
+        print("-" * 80)
+        
+        for impl, data in perf_metrics.items():
+            if data:  # Only print if we have valid data
+                row = [
+                    impl,
+                    f"{data['Total Time (ms)']:.2f}",
+                    f"{data['Throughput (seams/sec)']:.2f}",
+                    f"{data['Speedup']:.2f}"
+                ]
+                print(row_format.format(*row))
+    else:
+        print("\nNo valid metrics were collected from any implementation.")
+    
+    # Cleanup temporary files
+    try:
+        os.remove(temp_ppm)
+        print("\nTemporary files cleaned up successfully")
+    except Exception as e:
+        print(f"\nError cleaning up temporary files: {str(e)}")
 
 if __name__ == "__main__":
     main() 
