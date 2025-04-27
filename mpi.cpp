@@ -13,7 +13,7 @@ using namespace std;
 void readPnm(char * fileName, int &width, int &height, uchar3 * &pixels);
 void writePnm(uchar3 *pixels, int width, int height, int originalWidth, char *fileName);
 uint8_t getClosest(uint8_t *pixels, int r, int c, int width, int height, int originalWidth);
-int pixelsImportant(uint8_t * grayPixels, int row, int col, int width, int height, int originalWidth);
+int backwardEnergy(uint8_t * grayPixels, int row, int col, int width, int height, int originalWidth);
 void RGB2Gray(uchar3 * inPixels, int width, int height, uint8_t * outPixels);
 void seamsScore(int *importants, int *score, int width, int height, int originalWidth);
 void forwardEnergy(uint8_t *grayPixels, int width, int height, float *energy, int originalWidth);
@@ -37,7 +37,7 @@ uint8_t getClosest(uint8_t *pixels, int r, int c, int width, int height, int ori
     return pixels[r * originalWidth + c];
 }
 
-int pixelsImportant(uint8_t * grayPixels, int row, int col, int width, int height, int originalWidth) {
+int backwardEnergy(uint8_t * grayPixels, int row, int col, int width, int height, int originalWidth) {
     int x = 0, y = 0;
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
@@ -297,7 +297,7 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
         auto backwardStart = std::chrono::high_resolution_clock::now();
         for (int r = startRow; r < startRow + localHeight; ++r) {
             for (int c = 0; c < width; ++c) {
-                importants[r * originalWidth + c] = pixelsImportant(grayPixels, r, c, width, height, originalWidth);
+                importants[r * originalWidth + c] = backwardEnergy(grayPixels, r, c, width, height, originalWidth);
             }
         }
         auto backwardEnd = std::chrono::high_resolution_clock::now();

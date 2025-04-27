@@ -37,6 +37,12 @@ copy Release\*.exe ..\
 cp *.exe ../
 ```
 
+Source code:
+- `sequential.cpp` (Sequential implementation)
+- `openmp.cpp` (OpenMP implementation)
+- `cuda.cu` (CUDA implementation)
+- `mpi.cpp` (MPI implementation)
+
 The following executables will be created:
 - `seam_carving_seq.exe` (Sequential implementation)
 - `seam_carving_omp.exe` (OpenMP implementation)

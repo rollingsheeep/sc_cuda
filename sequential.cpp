@@ -12,7 +12,7 @@ using namespace std;
 void readPnm(char * fileName, int &width, int &height, uchar3 * &pixels);
 void writePnm(uchar3 *pixels, int width, int height, int originalWidth, char *fileName);
 uint8_t getClosest(uint8_t *pixels, int r, int c, int width, int height, int originalWidth);
-int pixelsImportant(uint8_t * grayPixels, int row, int col, int width, int height, int originalWidth);
+int backwardEnergy(uint8_t * grayPixels, int row, int col, int width, int height, int originalWidth);
 void RGB2Gray(uchar3 * inPixels, int width, int height, uint8_t * outPixels);
 void seamsScore(int *importants, int *score, int width, int height, int originalWidth);
 void forwardEnergy(uint8_t *grayPixels, int width, int height, float *energy, int originalWidth);
@@ -61,7 +61,7 @@ uint8_t getClosest(uint8_t *pixels, int r, int c, int width, int height, int ori
  * @param originalWidth - Original image width
  * @return int - Importance value (higher means more important/edge-like)
  */
-int pixelsImportant(uint8_t * grayPixels, int row, int col, int width, int height, int originalWidth) {
+int backwardEnergy(uint8_t * grayPixels, int row, int col, int width, int height, int originalWidth) {
     int x = 0, y = 0;
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
@@ -235,7 +235,7 @@ void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth,
         auto backwardStart = std::chrono::high_resolution_clock::now();
         for (int r = 0; r < height; ++r) {
             for (int c = 0; c < width; ++c) {
-                importants[r * originalWidth + c] = pixelsImportant(grayPixels, r, c, width, height, originalWidth);
+                importants[r * originalWidth + c] = backwardEnergy(grayPixels, r, c, width, height, originalWidth);
             }
         }
         auto backwardEnd = std::chrono::high_resolution_clock::now();
@@ -288,7 +288,7 @@ void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth,
                 // Update importance values for pixels in a 5-pixel window around the previous seam
                 // This is an optimization to only recompute importance for affected pixels
                 for (int affectedCol = max(0, prevMinCol - 2); affectedCol <= prevMinCol + 2 && affectedCol < width - 1; ++affectedCol) {
-                    importants[(r + 1) * originalWidth + affectedCol] = pixelsImportant(grayPixels, r + 1, affectedCol, width - 1, height, originalWidth);
+                    importants[(r + 1) * originalWidth + affectedCol] = backwardEnergy(grayPixels, r + 1, affectedCol, width - 1, height, originalWidth);
                 }
             }
 
@@ -315,7 +315,7 @@ void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth,
         // Update importance map for first row
         auto firstRowUpdateStart = std::chrono::high_resolution_clock::now();
         for (int affectedCol = max(0, minCol - 2); affectedCol <= minCol + 2 && affectedCol < width - 1; ++affectedCol) {
-            importants[affectedCol] = pixelsImportant(grayPixels, 0, affectedCol, width - 1, height, originalWidth);
+            importants[affectedCol] = backwardEnergy(grayPixels, 0, affectedCol, width - 1, height, originalWidth);
         }
         auto firstRowUpdateEnd = std::chrono::high_resolution_clock::now();
 

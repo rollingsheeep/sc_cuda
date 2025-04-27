@@ -21,12 +21,17 @@ using namespace std;
 
 // Forward declarations of CUDA kernels
 __global__ void Rgb2GrayKernel(uchar3 * inPixels, int width, int height, uint8_t * outPixels);
-__global__ void pixelsImportantKernel(uint8_t * inPixels, int width, int height, int* xfilter, int* yfilter, int * importants);
+__global__ void backwardEnergyKernel(uint8_t * inPixels, int width, int height, int* xfilter, int* yfilter, int * importants);
 __global__ void carvingKernel(int *leastSignificantPixel, uchar3 *outPixels, uint8_t *grayPixels, int * importants, int width);
 __global__ void seamsScoreKernel(int *importants, int *score, int width, int height, int fromRow);
 __global__ void forwardEnergyKernel(uint8_t *grayPixels, int width, int height, float *energy);
 __global__ void hybridEnergyKernel(int *backwardEnergy, float *forwardEnergy, float *hybridEnergy, int width, int height);
 __global__ void convertToIntKernel(float *floatEnergy, int *intEnergy, int width, int height);
+__global__ void updateLocalBackwardEnergyKernel(uint8_t *grayPixels, int *importants, int width, int height, int *seamPath);
+
+// Add at the top of the file, after other declarations
+__device__ __constant__ int d_xSobel[9] = {1, 0, -1, 2, 0, -2, 1, 0, -1};
+__device__ __constant__ int d_ySobel[9] = {1, 2, 1, 0, 0, 0, -1, -2, -1};
 
 /**
  * Helper class for measuring CUDA execution time
@@ -132,9 +137,6 @@ void writePnm(uchar3 *pixels, int width, int height, int originalWidth, char *fi
     fclose(f);
 }
 
-int xSobel[3][3] = {{1,0,-1},{2,0,-2},{1,0,-1}};
-int ySobel[3][3] = {{1,2,1},{0,0,0},{-1,-2,-1}};
-
 __device__ int d_originalWidth;
 
 /**
@@ -166,18 +168,17 @@ __global__ void Rgb2GrayKernel(uchar3 * inPixels, int width, int height, uint8_t
  * @param yfilter - Sobel y-filter in device memory
  * @param importants - Output importance values in device memory
  */
-__global__ void pixelsImportantKernel(uint8_t * inPixels, int width, int height, int* xfilter, int* yfilter, int * importants) {
+__global__ void backwardEnergyKernel(uint8_t * inPixels, int width, int height, int* xfilter, int* yfilter, int * importants) {
     int px = blockIdx.x * blockDim.x + threadIdx.x;
-	int py = blockIdx.y * blockDim.y + threadIdx.y;
-	if (px >= width || py >= height) 
-	{
-		return;
-	}
+    int py = blockIdx.y * blockDim.y + threadIdx.y;
+    if (px >= width || py >= height) 
+    {
+        return;
+    }
 
     int x = 0, y = 0;
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
-
             // Handling the case of pixels falling outside the boundary
             int r = (py - 1) + i;
             int c = (px - 1) + j;
@@ -191,10 +192,10 @@ __global__ void pixelsImportantKernel(uint8_t * inPixels, int width, int height,
             } else if (c >= width) {
                 c = width - 1;
             }
-            int idx = i * 3 + j;
+            int sobelIdx = i * 3 + j;
             uint8_t closest = inPixels[r * d_originalWidth + c];
-            x += closest * xfilter[idx];
-            y += closest * yfilter[idx];
+            x += static_cast<int>(closest) * d_xSobel[sobelIdx];
+            y += static_cast<int>(closest) * d_ySobel[sobelIdx];
         }
     }
     importants[py * d_originalWidth + px] = abs(x) + abs(y);
@@ -313,12 +314,16 @@ __global__ void forwardEnergyKernel(uint8_t *grayPixels, int width, int height, 
         return;
     }
     
-    // Get neighboring pixel values safely with bounds
-    float left = (col > 0) ? static_cast<float>(grayPixels[idx - 1]) : static_cast<float>(grayPixels[idx]);
-    float right = (col < width - 1) ? static_cast<float>(grayPixels[idx + 1]) : static_cast<float>(grayPixels[idx]);
-    float up = static_cast<float>(grayPixels[idx - d_originalWidth]);
-    float upLeft = (col > 0) ? static_cast<float>(grayPixels[idx - d_originalWidth - 1]) : up;
-    float upRight = (col < width - 1) ? static_cast<float>(grayPixels[idx - d_originalWidth + 1]) : up;
+    // Get neighboring pixel values with proper boundary handling like getClosest()
+    int leftCol = max(0, col - 1);
+    int rightCol = min(width - 1, col + 1);
+    int upRow = max(0, row - 1);
+    
+    float left = static_cast<float>(grayPixels[row * d_originalWidth + leftCol]);
+    float right = static_cast<float>(grayPixels[row * d_originalWidth + rightCol]);
+    float up = static_cast<float>(grayPixels[upRow * d_originalWidth + col]);
+    float upLeft = static_cast<float>(grayPixels[upRow * d_originalWidth + leftCol]);
+    float upRight = static_cast<float>(grayPixels[upRow * d_originalWidth + rightCol]);
     
     // Compute directional costs using floating-point
     float cU = fabsf(right - left);  // Cost for going straight up
@@ -381,6 +386,48 @@ __global__ void convertToIntKernel(float *floatEnergy, int *intEnergy, int width
     
     int idx = row * d_originalWidth + col;
     intEnergy[idx] = static_cast<int>(floatEnergy[idx] * 255.0f);
+}
+
+/**
+ * CUDA kernel for updating backward energy locally after seam removal
+ * Each thread updates one pixel in the affected window
+ */
+__global__ void updateLocalBackwardEnergyKernel(uint8_t *grayPixels, int *importants, int width, int height, int *seamPath) {
+    int row = blockIdx.x;
+    if (row >= height) return;
+    
+    int seamCol = seamPath[row];
+    int baseIdx = row * d_originalWidth;
+    
+    // Update a 5-pixel window around the seam
+    for (int dc = -2; dc <= 2; dc++) {
+        int col = seamCol + dc;
+        if (col >= 0 && col < width - 1) {  // width-1 because we already shifted pixels
+            int idx = baseIdx + col;
+            int x = 0, y = 0;
+            
+            // Apply Sobel filter with safe boundary handling
+            for (int i = 0; i < 3; ++i) {
+                for (int j = 0; j < 3; ++j) {
+                    int r = (row - 1) + i;
+                    int c = (col - 1) + j;
+                    
+                    // Replicate border pixels like getClosest()
+                    if (r < 0) r = 0;
+                    else if (r >= height) r = height - 1;
+                    
+                    if (c < 0) c = 0;
+                    else if (c >= width - 1) c = width - 2;  // width-2 because we already shifted
+                    
+                    int pixel = static_cast<int>(grayPixels[r * d_originalWidth + c]);
+                    int sobelIdx = i * 3 + j;
+                    x += pixel * d_xSobel[sobelIdx];
+                    y += pixel * d_ySobel[sobelIdx];
+                }
+            }
+            importants[idx] = abs(x) + abs(y);
+        }
+    }
 }
 
 /**
@@ -448,22 +495,11 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
     auto grayscaleEnd = std::chrono::high_resolution_clock::now();
     totalGrayscaleTime = std::chrono::duration_cast<std::chrono::microseconds>(grayscaleEnd - grayscaleStart).count() / 1000.0;
 
-    // Allocate and initialize values for 2 filters
-    int _xSobel[9] = {1, 0, -1, 2, 0, -2, 1, 0, -1};
-    int _ySobel[9] = {1, 2, 1, 0, 0, 0, -1, -2, -1};
-    int* xfilter, *yfilter;
-    int xysize = 9*sizeof(int);
-    CHECK(cudaMalloc(&xfilter, xysize))
-    CHECK(cudaMalloc(&yfilter, xysize))
-
-    CHECK(cudaMemcpy(xfilter, _xSobel, xysize, cudaMemcpyHostToDevice));
-    CHECK(cudaMemcpy(yfilter, _ySobel, xysize, cudaMemcpyHostToDevice));
-
     // Loop to delete each seam
     while (width > targetWidth) {
         // Step 2: Calculate backward energy
         auto backwardStart = std::chrono::high_resolution_clock::now();
-        pixelsImportantKernel<<<gridSize, blockSize, smemSize>>>(d_grayPixels, width, height, xfilter, yfilter, d_importants);
+        backwardEnergyKernel<<<gridSize, blockSize, smemSize>>>(d_grayPixels, width, height, nullptr, nullptr, d_importants);
         cudaDeviceSynchronize();
         CHECK(cudaGetLastError());
         auto backwardEnd = std::chrono::high_resolution_clock::now();
@@ -505,15 +541,21 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
         auto seamTracingStart = std::chrono::high_resolution_clock::now();
         CHECK(cudaMemcpy(score, d_score, originalWidth * height * sizeof(int), cudaMemcpyDeviceToHost));
         trace(score, leastSignificantPixel, width, height, originalWidth);
-        auto seamTracingEnd = std::chrono::high_resolution_clock::now();
-        totalSeamTracingTime += std::chrono::duration_cast<std::chrono::microseconds>(seamTracingEnd - seamTracingStart).count() / 1000.0;
-
-        // Step 4: Delete the seam found
         CHECK(cudaMemcpy(d_leastSignificantPixel, leastSignificantPixel, height * sizeof(int), cudaMemcpyHostToDevice));
+        
+        // Step 4: Delete the seam and update local importance values
         carvingKernel<<<height, 1>>>(d_leastSignificantPixel, d_inPixels, d_grayPixels, d_importants, width);
         cudaDeviceSynchronize();
         CHECK(cudaGetLastError());
         
+        // Update local importance values around the removed seam
+        updateLocalBackwardEnergyKernel<<<height, 1>>>(d_grayPixels, d_importants, width, height, d_leastSignificantPixel);
+        cudaDeviceSynchronize();
+        CHECK(cudaGetLastError());
+        
+        auto seamTracingEnd = std::chrono::high_resolution_clock::now();
+        totalSeamTracingTime += std::chrono::duration_cast<std::chrono::microseconds>(seamTracingEnd - seamTracingStart).count() / 1000.0;
+
         --width;
     }
 
@@ -527,8 +569,6 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
     CHECK(cudaFree(d_score));
     CHECK(cudaFree(d_forwardEnergy));
     CHECK(cudaFree(d_hybridEnergy));
-    CHECK(cudaFree(xfilter));
-    CHECK(cudaFree(yfilter));
     free(score);
     free(leastSignificantPixel);
     free(importants);
