@@ -76,7 +76,7 @@ Performance evaluation and analysis can be found in the following Jupyter notebo
   - Individual component timing analysis
   - Throughput comparison
   - Speedup analysis
-  - Visualizations of performance metrics
+  - Image quality verification
 
 ### Multi-Image Analysis
 The following notebooks analyze performance across 50 images of varying sizes:
@@ -93,3 +93,46 @@ The notebooks provide comprehensive analysis of:
 - Total processing time
 - Throughput (seams per second)
 - Speedup relative to sequential implementation
+
+## Running Analysis Notebooks
+
+### Prerequisites
+1. Ensure you have input images in the `inputdata` directory
+   - If you don't have images, you can download them from our [Google Drive](https://drive.google.com/drive/folders/1tQkhsvuiwpFwHxvHuTgq-ueyz29ZJC77?usp=sharing)
+   - Images should be in JPG format
+
+### Analysis Workflow
+
+1. Convert input images to PNM format:
+```bash
+python convert_input.py
+```
+This will convert all JPG images in `inputdata` directory to PNM format, which is required for the analysis.
+
+2. Run the analysis notebooks in the following order:
+   - `sequential_performance.ipynb`
+   - `openmp_performance.ipynb`
+   - `cuda_performance.ipynb`
+   - `mpi_performance.ipynb`
+
+   Each notebook will:
+   - Process the test image set
+   - Generate performance metrics
+   - Create visualizations
+   - Save results in `outputdatatemp` directory
+
+3. Convert output images back to JPG format:
+```bash
+python convert_output.py
+```
+This will convert all processed images in `outputdatatemp` directory from PNM format back to JPG format.
+
+### Analysis Results
+The notebooks will generate comprehensive performance analysis including:
+- Processing time for each component
+- Throughput comparison
+- Speedup analysis
+- Memory usage patterns
+- Scaling characteristics
+
+Results will be saved in both raw data format and visualizations for easy comparison between implementations.
