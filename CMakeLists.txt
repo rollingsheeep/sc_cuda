@@ -45,9 +45,19 @@ add_executable(seam_carving_mpi
 )
 target_link_libraries(seam_carving_mpi common_lib MPI::MPI_CXX)
 
-# CUDA version
-cuda_add_executable(seam_carving_cuda
+# CUDA version - using cuda.cu (original)
+cuda_add_executable(seam_carving_cuda_orig
     cuda.cu
+)
+target_link_libraries(seam_carving_cuda_orig common_lib)
+
+# CUDA version - using cuda_seam_carving.cu (new implementation)
+cuda_add_executable(seam_carving_cuda
+    # 原本的cuda.cu在这边，上面的add_executable是新加给cuda.cu的，为了和cuda_seam_carving.cu区分开来
+    # cuda.cu
+    # common.h
+    # common.cpp
+    cuda_seam_carving.cu
 )
 target_link_libraries(seam_carving_cuda common_lib)
 
@@ -63,7 +73,8 @@ else()
 endif()
 
 # Installation
-install(TARGETS seam_carving_seq seam_carving_omp seam_carving_mpi seam_carving_cuda common_lib
+# install(TARGETS seam_carving_seq seam_carving_omp seam_carving_mpi seam_carving_cuda common_lib
+install(TARGETS seam_carving_seq seam_carving_omp seam_carving_mpi seam_carving_cuda seam_carving_cuda_orig common_lib
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib

@@ -1,22 +1,19 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <stdio.h>
-#include <stdint.h>
+#include <cstdint>
 #include <string>
-#include <cmath>
-#include <algorithm>
 
-using namespace std;
-
-// Common type definitions
-struct uchar3 {
-    uint8_t x, y, z;
-};
+// RGB pixel structure aligned with CUDA's uchar3
+typedef struct {
+    uint8_t x;  // R
+    uint8_t y;  // G
+    uint8_t z;  // B
+} uchar3;
 
 // Common function declarations
 void readPnm(char * fileName, int &width, int &height, uchar3 * &pixels);
 void writePnm(uchar3 *pixels, int width, int height, int originalWidth, char *fileName);
-char *concatStr(const char * s1, const char * s2);
+char* concatStr(char* s1, const char* s2);
 
 #endif // COMMON_H 
