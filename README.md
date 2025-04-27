@@ -43,11 +43,13 @@ Source code:
 - `cuda.cu` (CUDA implementation)
 - `mpi.cpp` (MPI implementation)
 
-The following executables will be created:
+The following executables will be created in build/release directory:
 - `seam_carving_seq.exe` (Sequential implementation)
 - `seam_carving_omp.exe` (OpenMP implementation)
 - `seam_carving_cuda.exe` (CUDA implementation)
 - `seam_carving_mpi.exe` (MPI implementation)
+
+Copy and Paste them in root directory same as run_program
 
 ## Running the Program
 
@@ -98,9 +100,9 @@ The notebooks provide comprehensive analysis of:
 
 ### Prerequisites
 1. Ensure you have input images in the `inputdata` directory
-   - If you don't have images, you can download them from our [Google Drive](https://drive.google.com/drive/folders/1tQkhsvuiwpFwHxvHuTgq-ueyz29ZJC77?usp=sharing)
+   - If you don't have images, you can download them (50 pics) from our [Google Drive](https://drive.google.com/drive/folders/1tQkhsvuiwpFwHxvHuTgq-ueyz29ZJC77?usp=sharing)
    - Images should be in JPG format
-
+2. Default output result (4 x 50 pics) [Google Drive](https://drive.google.com/drive/folders/1ZDuFBfNDO9bPIeWUaJKIvPpa0SnOtsdF?usp=sharing)
 ### Analysis Workflow
 
 1. Convert input images to PNM format:
