@@ -234,13 +234,14 @@ def main():
     # Process each implementation
     implementations = ['seq', 'omp', 'cuda', 'mpi']
     metrics = {}
+    pnm_files = []  # Store paths of generated PNM files
     
     for impl in implementations:
         print(f"\nProcessing {impl} implementation...")
         exe_name = f"seam_carving_{impl}.exe"
+        # The implementations already append their suffix (_seq, _omp, etc.)
         output_ppm = os.path.join(temp_dir, f"{output_base}.pnm")
         output_jpg = os.path.join(output_dir, f"{output_base}_{impl}.jpg")
-        output_temp = os.path.join(temp_dir, f"{output_base}_{impl}.pnm")
         
         try:
             # Prepare the command based on implementation
@@ -265,20 +266,26 @@ def main():
             if impl_metrics:
                 metrics[impl] = impl_metrics[impl]
             
-            # Convert output to JPG if PPM exists
-            if os.path.exists(output_temp):
-                if convert_ppm_to_jpg(output_temp, output_jpg):
-                    print(f"Created: {output_jpg}")
-                    # Clean up the temporary PPM file
-                    os.remove(output_temp)
-                else:
-                    print(f"Failed to convert {output_temp} to JPG")
+            # The actual output PNM will have the implementation suffix
+            actual_output_ppm = os.path.join(temp_dir, f"{output_base}_{impl}.pnm")
+            if os.path.exists(actual_output_ppm):
+                pnm_files.append((actual_output_ppm, output_jpg))
             else:
-                print(f"Warning: Output file {output_temp} not found")
+                print(f"Warning: Output file {actual_output_ppm} not found")
                 
         except Exception as e:
             print(f"Error running {impl} implementation: {str(e)}")
             continue
+    
+    # Convert all PNM files to JPG at the end
+    print("\nConverting all PNM files to JPG...")
+    for pnm_path, jpg_path in pnm_files:
+        if convert_ppm_to_jpg(pnm_path, jpg_path):
+            print(f"Created: {jpg_path}")
+            # Clean up the temporary PPM file
+            os.remove(pnm_path)
+        else:
+            print(f"Failed to convert {pnm_path} to JPG")
     
     # Calculate and display performance metrics
     if metrics:
