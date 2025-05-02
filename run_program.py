@@ -232,7 +232,12 @@ def main():
     all_output = ""
     
     # Process each implementation
-    implementations = ['seq', 'omp', 'cuda', 'mpi']
+    implementations = [
+        'seq', 
+        'omp', 
+        'cuda', 
+        'mpi'
+        ]
     metrics = {}
     pnm_files = []  # Store paths of generated PNM files
     

@@ -45,12 +45,6 @@ void writePnm(uchar3 *pixels, int width, int height, int originalWidth, char *fi
     FILE * f = fopen(fileName, "w");
     if (f == NULL)
     {
-
-
-
-
-
-
         printf("Cannot write %s\n", fileName);
         exit(EXIT_FAILURE);
     }   

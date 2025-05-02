@@ -264,6 +264,7 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
     float *forwardEnergyArray = (float *)malloc(width * height * sizeof(float));
     float *hybridEnergyArray = (float *)malloc(width * height * sizeof(float));
     float *gatheredHybridEnergy = nullptr;  // Only allocated on rank 0
+    int *gatheredImportants = nullptr; // Only allocated on rank 0
 
     // Calculate rows per process and displacements for MPI_Gatherv
     int *sendcounts = (int *)malloc(size * sizeof(int));
@@ -284,6 +285,7 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
 
     if (rank == 0) {
         gatheredHybridEnergy = (float *)malloc(width * height * sizeof(float));
+        gatheredImportants = (int *)malloc(width * height * sizeof(int)); // Allocate on rank 0
     }
 
     // Convert to grayscale
@@ -302,6 +304,17 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
         }
         auto backwardEnd = std::chrono::high_resolution_clock::now();
         totalBackwardEnergyTime += std::chrono::duration_cast<std::chrono::microseconds>(backwardEnd - backwardStart).count() / 1000.0;
+
+        // Gather backward energy (importants) onto rank 0
+        MPI_Gatherv(importants + startRow * originalWidth, // Send local chunk
+                   localHeight * originalWidth,          // Size of local chunk
+                   MPI_INT,                              // Type
+                   gatheredImportants,                   // Receive buffer on rank 0
+                   sendcounts,                           // Count per rank
+                   displs,                               // Displacement per rank
+                   MPI_INT,                              // Type
+                   0,                                    // Root rank
+                   MPI_COMM_WORLD);
 
         // Calculate forward energy locally
         auto forwardStart = std::chrono::high_resolution_clock::now();
@@ -327,17 +340,10 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
                    MPI_COMM_WORLD);
 
         if (rank == 0) {
-            // Convert hybrid energy to integer for seam finding
-            for (int r = 0; r < height; ++r) {
-                for (int c = 0; c < width; ++c) {
-                    int idx = r * originalWidth + c;
-                    importants[idx] = static_cast<int>(gatheredHybridEnergy[idx] * 255.0f);
-                }
-            }
-
             // Dynamic programming to find minimal seam
             auto dpStart = std::chrono::high_resolution_clock::now();
-            seamsScore(importants, score, width, height, originalWidth);
+            // Use the gathered importants array
+            seamsScore(gatheredImportants, score, width, height, originalWidth);
             auto dpEnd = std::chrono::high_resolution_clock::now();
             totalDpTime += std::chrono::duration_cast<std::chrono::microseconds>(dpEnd - dpStart).count() / 1000.0;
 
@@ -353,29 +359,37 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
                 for (int c = minCol; c < width - 1; ++c) {
                     outPixels[r * originalWidth + c] = outPixels[r * originalWidth + c + 1];
                     grayPixels[r * originalWidth + c] = grayPixels[r * originalWidth + c + 1];
-                    importants[r * originalWidth + c] = importants[r * originalWidth + c + 1];
                 }
 
                 if (r > 0) {
-                    int aboveIdx = (r - 1) * originalWidth + minCol;
-                    int min = score[aboveIdx], minColCpy = minCol;
-                    if (minColCpy > 0 && score[aboveIdx - 1] < min) {
-                        min = score[aboveIdx - 1];
-                        minCol = minColCpy - 1;
+                    int prev_minCol = minCol; // Store column from current row r
+                    int base_check_idx = (r - 1) * originalWidth + prev_minCol; // Index directly above in row r-1
+
+                    int best_col_prev_row = prev_minCol;          // Start by assuming the middle column is best
+                    int min_score_prev_row = score[base_check_idx]; // Get score directly above
+
+                    // Check score above-left
+                    if (prev_minCol > 0 && score[base_check_idx - 1] < min_score_prev_row) {
+                        min_score_prev_row = score[base_check_idx - 1];
+                        best_col_prev_row = prev_minCol - 1;
                     }
-                    if (minColCpy < width - 1 && score[aboveIdx + 1] < min) {
-                        minCol = minColCpy + 1;
+
+                    // Check score above-right (compare with the current minimum found so far)
+                    if (prev_minCol < width - 1 && score[base_check_idx + 1] < min_score_prev_row) {
+                        // No need to update min_score_prev_row, just the best column
+                        best_col_prev_row = prev_minCol + 1;
                     }
+
+                    minCol = best_col_prev_row; // Update minCol for the next iteration (row r-1)
                 }
             }      
             auto seamTracingEnd = std::chrono::high_resolution_clock::now();
             totalSeamTracingTime += std::chrono::duration_cast<std::chrono::microseconds>(seamTracingEnd - seamTracingStart).count() / 1000.0;
         }
 
-        // Broadcast updated image to all ranks
-        MPI_Bcast(outPixels, width * height * sizeof(uchar3), MPI_BYTE, 0, MPI_COMM_WORLD);
-        MPI_Bcast(grayPixels, width * height * sizeof(uint8_t), MPI_BYTE, 0, MPI_COMM_WORLD);
-        MPI_Bcast(importants, width * height * sizeof(int), MPI_INT, 0, MPI_COMM_WORLD);
+        // Broadcast updated image and grayscale to all ranks
+        MPI_Bcast(outPixels, (width - 1) * height * sizeof(uchar3), MPI_BYTE, 0, MPI_COMM_WORLD);
+        MPI_Bcast(grayPixels, (width - 1) * height * sizeof(uint8_t), MPI_BYTE, 0, MPI_COMM_WORLD);
 
         --width;
     }
@@ -390,6 +404,7 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
     free(displs);
     if (rank == 0) {
         free(gatheredHybridEnergy);
+        free(gatheredImportants); // Free the gathered array
     }
 
     // Print timing information on rank 0

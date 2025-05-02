@@ -4,6 +4,9 @@
 #include <cmath>
 #include <algorithm>
 #include <chrono>
+#include <fstream>  // For file output
+#include <vector>   // For potential buffer usage (not strictly needed here)
+#include <iomanip>  // For formatting float output
 
 using namespace std;
 
@@ -22,7 +25,7 @@ using namespace std;
 // Forward declarations of CUDA kernels
 __global__ void Rgb2GrayKernel(uchar3 * inPixels, int width, int height, uint8_t * outPixels);
 __global__ void backwardEnergyKernel(uint8_t * inPixels, int width, int height, int* xfilter, int* yfilter, int * importants);
-__global__ void carvingKernel(int *leastSignificantPixel, uchar3 *outPixels, uint8_t *grayPixels, int * importants, int width);
+__global__ void carvingKernel(int *leastSignificantPixel, uchar3 *outPixels, uint8_t *grayPixels, int width);
 __global__ void seamsScoreKernel(int *importants, int *score, int width, int height, int fromRow);
 __global__ void forwardEnergyKernel(uint8_t *grayPixels, int width, int height, float *energy);
 __global__ void hybridEnergyKernel(int *backwardEnergy, float *forwardEnergy, float *hybridEnergy, int width, int height);
@@ -207,16 +210,19 @@ __global__ void backwardEnergyKernel(uint8_t * inPixels, int width, int height, 
  * @param leastSignificantPixel - Array of column indices for the seam
  * @param outPixels - Output image in device memory
  * @param grayPixels - Grayscale image in device memory
- * @param importants - Importance values in device memory
  * @param width - Current image width
  */
-__global__ void carvingKernel(int *leastSignificantPixel, uchar3 *outPixels, uint8_t *grayPixels, int * importants, int width) {
+__global__ void carvingKernel(int *leastSignificantPixel, uchar3 *outPixels, uint8_t *grayPixels, int width) {
     int row = blockIdx.x;
     int baseIdx = row * d_originalWidth;
-    for (int i = leastSignificantPixel[row]; i < width - 1; ++i) {
-        outPixels[baseIdx + i] = outPixels[baseIdx + i + 1];
-        grayPixels[baseIdx + i] = grayPixels[baseIdx + i + 1];
-        importants[baseIdx + i] = importants[baseIdx + i + 1];
+    int seamCol = leastSignificantPixel[row];
+    
+    // Shift pixels to the left starting from the seam column
+    for (int col = seamCol; col < width - 1; ++col) {
+        int current_idx = baseIdx + col;
+        int next_idx = baseIdx + col + 1;
+        outPixels[current_idx] = outPixels[next_idx];
+        grayPixels[current_idx] = grayPixels[next_idx];
     }
 }
 
@@ -263,6 +269,7 @@ __global__ void seamsScoreKernel(int *importants, int *score, int width, int hei
     size_t halfBlock = blockDim.x >> 1;
 
     int col = blockIdx.x * halfBlock - halfBlock + threadIdx.x;
+    int globalCol = col + halfBlock; // Global column index in the image
 
     if (fromRow == 0 && col >= 0 && col < width) {
         score[col] = importants[col];
@@ -278,15 +285,20 @@ __global__ void seamsScoreKernel(int *importants, int *score, int width, int hei
                 int idx = curRow * d_originalWidth + curCol;
                 int aboveIdx = (curRow - 1) * d_originalWidth + curCol;
 
-                int min = score[aboveIdx];
-                if (curCol > 0 && score[aboveIdx - 1] < min) {
-                    min = score[aboveIdx - 1];
-                }
-                if (curCol < width - 1 && score[aboveIdx + 1] < min) {
-                    min = score[aboveIdx + 1];
+                // Handle absolute image boundaries correctly
+                int min_prev_score;
+                if (curCol == 0) {
+                    // Leftmost column: only compare center and right
+                    min_prev_score = min(score[aboveIdx], score[aboveIdx + 1]);
+                } else if (curCol == width - 1) {
+                    // Rightmost column: only compare left and center
+                    min_prev_score = min(score[aboveIdx - 1], score[aboveIdx]);
+                } else {
+                    // Middle columns: compare all three
+                    min_prev_score = min(min(score[aboveIdx - 1], score[aboveIdx]), score[aboveIdx + 1]);
                 }
 
-                score[idx] = min + importants[idx];
+                score[idx] = min_prev_score + importants[idx];
             }
         }
         __syncthreads();
@@ -317,26 +329,27 @@ __global__ void forwardEnergyKernel(uint8_t *grayPixels, int width, int height, 
     // Get neighboring pixel values with proper boundary handling like getClosest()
     int leftCol = max(0, col - 1);
     int rightCol = min(width - 1, col + 1);
-    int upRow = max(0, row - 1);
+    int upRow = row - 1; // Simpler since we know row > 0 here
     
     float left = static_cast<float>(grayPixels[row * d_originalWidth + leftCol]);
     float right = static_cast<float>(grayPixels[row * d_originalWidth + rightCol]);
     float up = static_cast<float>(grayPixels[upRow * d_originalWidth + col]);
-    float upLeft = static_cast<float>(grayPixels[upRow * d_originalWidth + leftCol]);
-    float upRight = static_cast<float>(grayPixels[upRow * d_originalWidth + rightCol]);
+    // No need for upLeft/upRight if matching OpenMP exactly
+    // float upLeft = static_cast<float>(grayPixels[upRow * d_originalWidth + leftCol]);
+    // float upRight = static_cast<float>(grayPixels[upRow * d_originalWidth + rightCol]);
     
-    // Compute directional costs using floating-point
+    // Compute directional costs using floating-point - Match OpenMP formula
     float cU = fabsf(right - left);  // Cost for going straight up
-    float cL = cU + fabsf(up - left);  // Cost for going up-left
-    float cR = cU + fabsf(up - right);  // Cost for going up-right
+    float cL = cU + fabsf(up - left);  // Cost for going up-left (matches OpenMP)
+    float cR = cU + fabsf(up - right);  // Cost for going up-right (matches OpenMP)
     
     // Get minimum previous path cost
-    float min_energy = energy[idx - d_originalWidth] + cU;
+    float min_energy = energy[idx - d_originalWidth] + cU; // Cost from pixel directly above
     if (col > 0) {
-        min_energy = fminf(min_energy, energy[idx - d_originalWidth - 1] + cL);
+        min_energy = fminf(min_energy, energy[idx - d_originalWidth - 1] + cL); // Cost from upper-left
     }
     if (col < width - 1) {
-        min_energy = fminf(min_energy, energy[idx - d_originalWidth + 1] + cR);
+        min_energy = fminf(min_energy, energy[idx - d_originalWidth + 1] + cR); // Cost from upper-right
     }
     
     energy[idx] = min_energy;
@@ -430,6 +443,24 @@ __global__ void updateLocalBackwardEnergyKernel(uint8_t *grayPixels, int *import
     }
 }
 
+// Helper function to write array data to a file (identical to OpenMP version)
+template<typename T>
+void writeArrayToFile(const std::string& filename, const T* data, int width, int height, int allocatedWidth) {
+    std::ofstream outFile(filename);
+    if (!outFile) {
+        fprintf(stderr, "Error: Cannot open file %s for writing.\n", filename.c_str());
+        return;
+    }
+    outFile << std::fixed << std::setprecision(10); // Set precision for floats
+    for (int r = 0; r < height; ++r) {
+        for (int c = 0; c < width; ++c) {
+            outFile << data[r * allocatedWidth + c] << (c == width - 1 ? "" : " ");
+        }
+        outFile << "\n";
+    }
+    printf("Debug data written to %s\n", filename.c_str());
+}
+
 /**
  * Main CUDA implementation of seam carving
  * Manages device memory and coordinates kernel execution
@@ -495,9 +526,15 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
     auto grayscaleEnd = std::chrono::high_resolution_clock::now();
     totalGrayscaleTime = std::chrono::duration_cast<std::chrono::microseconds>(grayscaleEnd - grayscaleStart).count() / 1000.0;
 
+    // Allocate HOST memory for debugging output
+    int *h_importants = nullptr;
+    float *h_forwardEnergy = nullptr;
+    int *h_score = nullptr;
+    bool debugOutputDone = false; // Flag to ensure output happens only once
+
     // Loop to delete each seam
     while (width > targetWidth) {
-        // Step 2: Calculate backward energy
+        // Step 2: Calculate backward energy -> stored in d_importants
         auto backwardStart = std::chrono::high_resolution_clock::now();
         backwardEnergyKernel<<<gridSize, blockSize, smemSize>>>(d_grayPixels, width, height, nullptr, nullptr, d_importants);
         cudaDeviceSynchronize();
@@ -505,7 +542,7 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
         auto backwardEnd = std::chrono::high_resolution_clock::now();
         totalBackwardEnergyTime += std::chrono::duration_cast<std::chrono::microseconds>(backwardEnd - backwardStart).count() / 1000.0;
 
-        // Step 2.1: Calculate forward energy
+        // Step 2.1: Calculate forward energy 
         auto forwardStart = std::chrono::high_resolution_clock::now();
         forwardEnergyKernel<<<gridSize, blockSize>>>(d_grayPixels, width, height, d_forwardEnergy);
         cudaDeviceSynchronize();
@@ -513,7 +550,7 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
         auto forwardEnd = std::chrono::high_resolution_clock::now();
         totalForwardEnergyTime += std::chrono::duration_cast<std::chrono::microseconds>(forwardEnd - forwardStart).count() / 1000.0;
 
-        // Step 2.2: Combine energies using hybrid approach
+        // Step 2.2: Combine energies using hybrid approach 
         auto hybridStart = std::chrono::high_resolution_clock::now();
         hybridEnergyKernel<<<gridSize, blockSize>>>(d_importants, d_forwardEnergy, d_hybridEnergy, width, height);
         cudaDeviceSynchronize();
@@ -521,13 +558,7 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
         auto hybridEnd = std::chrono::high_resolution_clock::now();
         totalHybridEnergyTime += std::chrono::duration_cast<std::chrono::microseconds>(hybridEnd - hybridStart).count() / 1000.0;
 
-        // Convert hybrid energy to integer for seam finding
-        dim3 convertGrid((width-1)/blockSize.x + 1, (height-1)/blockSize.y + 1);
-        convertToIntKernel<<<convertGrid, blockSize>>>(d_hybridEnergy, d_importants, width, height);
-        cudaDeviceSynchronize();
-        CHECK(cudaGetLastError());
-
-        // Step 3: Calculate the seam table to find the seam with the smallest value
+        // Step 3: Calculate the seam table using from d_importants
         auto dpStart = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < height; i += (stripHeight >> 1)) {
             seamsScoreKernel<<<gridSizeDp, blockSizeDp>>>(d_importants, d_score, width, height, i);
@@ -543,20 +574,68 @@ void seamCarvingByDevice(uchar3 *inPixels, int width, int height, int targetWidt
         trace(score, leastSignificantPixel, width, height, originalWidth);
         CHECK(cudaMemcpy(d_leastSignificantPixel, leastSignificantPixel, height * sizeof(int), cudaMemcpyHostToDevice));
         
-        // Step 4: Delete the seam and update local importance values
-        carvingKernel<<<height, 1>>>(d_leastSignificantPixel, d_inPixels, d_grayPixels, d_importants, width);
+        // Step 4: Delete the seam using the current width
+        carvingKernel<<<height, 1>>>(d_leastSignificantPixel, d_inPixels, d_grayPixels, width);
         cudaDeviceSynchronize();
         CHECK(cudaGetLastError());
-        
-        // Update local importance values around the removed seam
-        updateLocalBackwardEnergyKernel<<<height, 1>>>(d_grayPixels, d_importants, width, height, d_leastSignificantPixel);
+
+        // -------- Start: Intermediate Update Section (Mimic OpenMP) --------
+        int new_width = width - 1;
+        dim3 tempGridSize = dim3((new_width - 1) / blockSize.x + 1, (height - 1) / blockSize.y + 1);
+        int tempGridSizeDp = (((new_width - 1) / blockSizeDp + 1) << 1) + 1;
+
+        backwardEnergyKernel<<<tempGridSize, blockSize, smemSize>>>(d_grayPixels, new_width, height, nullptr, nullptr, d_importants);
         cudaDeviceSynchronize();
         CHECK(cudaGetLastError());
-        
+
+        for (int i = 0; i < height; i += (stripHeight >> 1)) {
+            seamsScoreKernel<<<tempGridSizeDp, blockSizeDp>>>(d_importants, d_score, new_width, height, i);
+            cudaDeviceSynchronize();
+            CHECK(cudaGetLastError());
+        }
+        // -------- End: Intermediate Update Section --------
+
+        // ---- Debug Output after first seam removal ----
+        if (width == originalWidth - 1 && !debugOutputDone) {
+            printf("\n--- Copying CUDA intermediate arrays (width=%d) to host ---\n", new_width);
+            size_t arraySize = (size_t)originalWidth * height;
+            h_importants = (int *)malloc(arraySize * sizeof(int));
+            h_forwardEnergy = (float *)malloc(arraySize * sizeof(float)); 
+            h_score = (int *)malloc(arraySize * sizeof(int));
+
+            if (!h_importants || !h_forwardEnergy || !h_score) { 
+                fprintf(stderr, "Error: Failed to allocate host memory for debug output.\n");
+            } else {
+                CHECK(cudaMemcpy(h_importants, d_importants, arraySize * sizeof(int), cudaMemcpyDeviceToHost));
+                CHECK(cudaMemcpy(h_forwardEnergy, d_forwardEnergy, arraySize * sizeof(float), cudaMemcpyDeviceToHost)); 
+                CHECK(cudaMemcpy(h_score, d_score, arraySize * sizeof(int), cudaMemcpyDeviceToHost));
+                cudaDeviceSynchronize();
+
+                // printf("--- Writing CUDA intermediate arrays (width=%d) ---\n", new_width);
+                // writeArrayToFile("cuda_importants_1.txt", h_importants, new_width, height, originalWidth); 
+                // writeArrayToFile("cuda_forward_1.txt", h_forwardEnergy, new_width, height, originalWidth); 
+                // writeArrayToFile("cuda_score_1.txt", h_score, new_width, height, originalWidth); 
+                // printf("--- Finished writing CUDA intermediate arrays ---\n\n");
+
+                free(h_importants); h_importants = nullptr;
+                free(h_forwardEnergy); h_forwardEnergy = nullptr; 
+                free(h_score); h_score = nullptr;
+            }
+            debugOutputDone = true;
+        }
+        // ---- End Debug Output ----
+
+        // NOW officially update width for the next loop iteration
+        --width;
+
+        // Update the main grid sizes for the *next* full iteration
+        gridSize = dim3((width - 1) / blockSize.x + 1, (height - 1) / blockSize.y + 1);
+        gridSizeDp = (((width - 1) / blockSizeDp + 1) << 1) + 1;
+        // Update convertGrid if it depends on width
+        dim3 convertGrid((width - 1) / blockSize.x + 1, (height - 1) / blockSize.y + 1);
+
         auto seamTracingEnd = std::chrono::high_resolution_clock::now();
         totalSeamTracingTime += std::chrono::duration_cast<std::chrono::microseconds>(seamTracingEnd - seamTracingStart).count() / 1000.0;
-
-        --width;
     }
 
     CHECK(cudaMemcpy(outPixels, d_inPixels, originalWidth * height * sizeof(uchar3), cudaMemcpyDeviceToHost));

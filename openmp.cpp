@@ -6,8 +6,29 @@
 #include <omp.h>
 #include "common.h"
 #include <chrono>
+#include <fstream>  // For file output
+#include <vector>   // For potential buffer usage (not strictly needed here)
+#include <iomanip>  // For formatting float output
 
 using namespace std;
+
+// Helper function to write array data to a file
+template<typename T>
+void writeArrayToFile(const std::string& filename, const T* data, int width, int height, int allocatedWidth) {
+    std::ofstream outFile(filename);
+    if (!outFile) {
+        fprintf(stderr, "Error: Cannot open file %s for writing.\n", filename.c_str());
+        return;
+    }
+    outFile << std::fixed << std::setprecision(10); // Set precision for floats
+    for (int r = 0; r < height; ++r) {
+        for (int c = 0; c < width; ++c) {
+            outFile << data[r * allocatedWidth + c] << (c == width - 1 ? "" : " ");
+        }
+        outFile << "\n";
+    }
+    printf("Debug data written to %s\n", filename.c_str());
+}
 
 // Forward declarations
 void readPnm(char * fileName, int &width, int &height, uchar3 * &pixels);
@@ -107,16 +128,16 @@ void forwardEnergy(uint8_t *grayPixels, int width, int height, float *energy, in
             float right = (c < width - 1) ? static_cast<float>(grayPixels[idx + 1]) : static_cast<float>(grayPixels[idx]);
             float up = static_cast<float>(grayPixels[idx - originalWidth]);
             
-            float cU = fabs(right - left);
-            float cL = cU + fabs(up - left);
-            float cR = cU + fabs(up - right);
+            float cU = fabsf(right - left);
+            float cL = cU + fabsf(up - left);
+            float cR = cU + fabsf(up - right);
             
             float min_energy = energy[idx - originalWidth] + cU;
             if (c > 0) {
-                min_energy = fmin(min_energy, energy[idx - originalWidth - 1] + cL);
+                min_energy = fminf(min_energy, energy[idx - originalWidth - 1] + cL);
             }
             if (c < width - 1) {
-                min_energy = fmin(min_energy, energy[idx - originalWidth + 1] + cR);
+                min_energy = fminf(min_energy, energy[idx - originalWidth + 1] + cR);
             }
             
             energy[idx] = min_energy;
@@ -131,7 +152,7 @@ void hybridEnergy(int *backwardEnergy, float *forwardEnergy, float *hybridEnergy
             int idx = r * originalWidth + c;
             float backwardNorm = static_cast<float>(backwardEnergy[idx]) / 255.0f;
             float forwardNorm = forwardEnergy[idx] / 255.0f;
-            hybridEnergy[idx] = fmax(backwardNorm, forwardNorm);
+            hybridEnergy[idx] = fmaxf(backwardNorm, forwardNorm);
         }
     }
 }
@@ -169,7 +190,7 @@ void seamCarvingByOpenMP(uchar3 *inPixels, int width, int height, int targetWidt
     totalGrayscaleTime = std::chrono::duration_cast<std::chrono::microseconds>(grayscaleEnd - grayscaleStart).count() / 1000.0;
 
     while (width > targetWidth) {
-        // Calculate backward energy (pixel importance)
+        // Calculate backward energy (pixel importance) -> stored in importants
         auto backwardStart = std::chrono::high_resolution_clock::now();
         #pragma omp parallel for
         for (int r = 0; r < height; ++r) {
@@ -180,28 +201,19 @@ void seamCarvingByOpenMP(uchar3 *inPixels, int width, int height, int targetWidt
         auto backwardEnd = std::chrono::high_resolution_clock::now();
         totalBackwardEnergyTime += std::chrono::duration_cast<std::chrono::microseconds>(backwardEnd - backwardStart).count() / 1000.0;
 
-        // Calculate forward energy
+        // Calculate forward energy 
         auto forwardStart = std::chrono::high_resolution_clock::now();
         forwardEnergy(grayPixels, width, height, forwardEnergyArray, originalWidth);
         auto forwardEnd = std::chrono::high_resolution_clock::now();
         totalForwardEnergyTime += std::chrono::duration_cast<std::chrono::microseconds>(forwardEnd - forwardStart).count() / 1000.0;
 
-        // Calculate hybrid energy
+        // Calculate hybrid energy 
         auto hybridStart = std::chrono::high_resolution_clock::now();
         hybridEnergy(importants, forwardEnergyArray, hybridEnergyArray, width, height, originalWidth);
         auto hybridEnd = std::chrono::high_resolution_clock::now();
         totalHybridEnergyTime += std::chrono::duration_cast<std::chrono::microseconds>(hybridEnd - hybridStart).count() / 1000.0;
 
-        // Convert hybrid energy to integer for seam finding
-        #pragma omp parallel for
-        for (int r = 0; r < height; ++r) {
-            for (int c = 0; c < width; ++c) {
-                int idx = r * originalWidth + c;
-                importants[idx] = static_cast<int>(hybridEnergyArray[idx] * 255.0f);
-            }
-        }
-
-        // Dynamic programming to find minimal seam
+        // Dynamic programming uses backward energy directly from 'importants'
         auto dpStart = std::chrono::high_resolution_clock::now();
         seamsScore(importants, score, width, height, originalWidth);
         auto dpEnd = std::chrono::high_resolution_clock::now();
@@ -225,31 +237,44 @@ void seamCarvingByOpenMP(uchar3 *inPixels, int width, int height, int targetWidt
             if (r > 0) {
                 prevMinCol = minCol;
                 int aboveIdx = (r - 1) * originalWidth + minCol;
-                int min = score[aboveIdx], minColCpy = minCol;
-                if (minColCpy > 0 && score[aboveIdx - 1] < min) {
-                    min = score[aboveIdx - 1];
-                    minCol = minColCpy - 1;
+                int min_score = score[aboveIdx], minColCpy = minCol;
+                if (prevMinCol > 0 && score[aboveIdx - 1] < min_score) {
+                    min_score = score[aboveIdx - 1];
+                    minCol = prevMinCol - 1;
                 }
-                if (minColCpy < width - 1 && score[aboveIdx + 1] < min) {
-                    minCol = minColCpy + 1;
+                if (prevMinCol < width - 1 && score[aboveIdx + 1] < min_score) {
+                    minCol = prevMinCol + 1;
                 }
             }
         }
         auto seamTracingEnd = std::chrono::high_resolution_clock::now();
         totalSeamTracingTime += std::chrono::duration_cast<std::chrono::microseconds>(seamTracingEnd - seamTracingStart).count() / 1000.0;
 
-        // Update importance map
+        // ---- Intermediate Update ----
+        int current_width = width; // Store width before decrementing
+        int next_width = width - 1;
+
         #pragma omp parallel for
-        for (int r = 0; r < height; ++r) {
-            for (int c = 0; c < width - 1; ++c) { // width-1 because width not decremented yet
-                importants[r * originalWidth + c] = backwardEnergy(grayPixels, r, c, width - 1, height, originalWidth);
+        for (int row_idx = 0; row_idx < height; ++row_idx) {
+            for (int col_idx = 0; col_idx < next_width; ++col_idx) {
+                 importants[row_idx * originalWidth + col_idx] = backwardEnergy(grayPixels, row_idx, col_idx, next_width, height, originalWidth);
             }
         }
+        seamsScore(importants, score, next_width, height, originalWidth);
+        // ---- End Intermediate Update ----
 
-        // Update seamsScore after updating importants
-        seamsScore(importants, score, width - 1, height, originalWidth);
+        // ---- Debug Output after first seam removal ----
+        // if (width == originalWidth - 1) {
+        //     printf("\n--- Writing OpenMP intermediate arrays (width=%d) ---\n", next_width);
+        //     writeArrayToFile("omp_importants_1.txt", importants, next_width, height, originalWidth); 
+        //     writeArrayToFile("omp_forward_1.txt", forwardEnergyArray, next_width, height, originalWidth); 
+        //     writeArrayToFile("omp_score_1.txt", score, next_width, height, originalWidth); 
+        //     printf("--- Finished writing OpenMP intermediate arrays ---\n\n");
+        // }
+        // ---- End Debug Output ----
+
         --width;
-    }
+    } // End while loop
     
     // Free memory
     free(grayPixels);

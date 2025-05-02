@@ -253,14 +253,6 @@ void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth,
         auto hybridEnd = std::chrono::high_resolution_clock::now();
         totalHybridEnergyTime += std::chrono::duration_cast<std::chrono::microseconds>(hybridEnd - hybridStart).count() / 1000.0;
 
-        // Convert hybrid energy to integer for seam finding
-        for (int r = 0; r < height; ++r) {
-            for (int c = 0; c < width; ++c) {
-                int idx = r * originalWidth + c;
-                importants[idx] = static_cast<int>(hybridEnergyArray[idx] * 255.0f);
-            }
-        }
-
         // Dynamic programming to find minimal seam
         auto dpStart = std::chrono::high_resolution_clock::now();
         seamsScore(importants, score, width, height, originalWidth);
@@ -268,7 +260,7 @@ void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth,
         totalDpTime += std::chrono::duration_cast<std::chrono::microseconds>(dpEnd - dpStart).count() / 1000.0;
 
         // Find where seam starts
-        int minCol = 0, r = height - 1, prevMinCol;
+        int minCol = 0, r = height - 1, prevMinCol = -1; // Initialize prevMinCol
         for (int c = 1; c < width; ++c) {
             if (score[r * originalWidth + c] < score[r * originalWidth + minCol])
                 minCol = c;
@@ -276,48 +268,50 @@ void seamCarvingByHost(uchar3 *inPixels, int width, int height, int targetWidth,
 
         // Seam tracing and removal
         auto seamTracingStart = std::chrono::high_resolution_clock::now();
-        for (; r >= 0; --r) {
-            for (int i = minCol; i < width - 1; ++i) {
+        for (r = height - 1; r >= 0; --r) { // Corrected loop variable
+            // Store the column index for the current row *before* finding the next one up
+            int currentCol = minCol; 
+
+            // Shift pixels left of the seam
+            for (int i = currentCol; i < width - 1; ++i) {
                 outPixels[r * originalWidth + i] = outPixels[r * originalWidth + i + 1];
                 grayPixels[r * originalWidth + i] = grayPixels[r * originalWidth + i + 1];
-                importants[r * originalWidth + i] = importants[r * originalWidth + i + 1];
+                // importants[r * originalWidth + i] = importants[r * originalWidth + i + 1]; // Don't shift importants if recalculating below
             }
 
-            if (r < height - 1) {
-                // Local update of importance map
-                // Update importance values for pixels in a 5-pixel window around the previous seam
-                // This is an optimization to only recompute importance for affected pixels
-                for (int affectedCol = max(0, prevMinCol - 2); affectedCol <= prevMinCol + 2 && affectedCol < width - 1; ++affectedCol) {
-                    importants[(r + 1) * originalWidth + affectedCol] = backwardEnergy(grayPixels, r + 1, affectedCol, width - 1, height, originalWidth);
-                }
-            }
-
+            // Find the next pixel in the seam (for the row above, r-1)
             if (r > 0) {
-                // Store current seam position for next iteration's local update
-                prevMinCol = minCol;
-                // Find the next pixel in the seam by looking at the three possible paths above
-                int aboveIdx = (r - 1) * originalWidth + minCol;
-                int min = score[aboveIdx], minColCpy = minCol;
+                prevMinCol = currentCol; // This is the column removed in row r
+                int aboveIdx = (r - 1) * originalWidth + prevMinCol;
+                int min_score = score[aboveIdx];
+                int nextMinCol = prevMinCol; // Start assuming center
+
                 // Check left diagonal path
-                if (minColCpy > 0 && score[aboveIdx - 1] < min) {
-                    min = score[aboveIdx - 1];
-                    minCol = minColCpy - 1;
+                if (prevMinCol > 0 && score[aboveIdx - 1] < min_score) {
+                    min_score = score[aboveIdx - 1];
+                    nextMinCol = prevMinCol - 1;
                 }
-                // Check right diagonal path
-                if (minColCpy < width - 1 && score[aboveIdx + 1] < min) {
-                    minCol = minColCpy + 1;
+                // Check right diagonal path (compare against current min_score)
+                if (prevMinCol < width - 1 && score[aboveIdx + 1] < min_score) {
+                    // min_score is NOT updated, only the column potentially changes
+                    nextMinCol = prevMinCol + 1;
                 }
+                minCol = nextMinCol; // Update minCol for the next loop iteration (row r-1)
             }
         }
         auto seamTracingEnd = std::chrono::high_resolution_clock::now();
         totalSeamTracingTime += std::chrono::duration_cast<std::chrono::microseconds>(seamTracingEnd - seamTracingStart).count() / 1000.0;
 
-        // Update importance map for first row
-        auto firstRowUpdateStart = std::chrono::high_resolution_clock::now();
-        for (int affectedCol = max(0, minCol - 2); affectedCol <= minCol + 2 && affectedCol < width - 1; ++affectedCol) {
-            importants[affectedCol] = backwardEnergy(grayPixels, 0, affectedCol, width - 1, height, originalWidth);
+        int next_width = width - 1;
+        // Recalculate energy for the new width
+        for (int row_idx = 0; row_idx < height; ++row_idx) {
+            for (int col_idx = 0; col_idx < next_width; ++col_idx) {
+                 importants[row_idx * originalWidth + col_idx] = backwardEnergy(grayPixels, row_idx, col_idx, next_width, height, originalWidth);
+            }
         }
-        auto firstRowUpdateEnd = std::chrono::high_resolution_clock::now();
+        // Recalculate seamsScore
+        seamsScore(importants, score, next_width, height, originalWidth);
+        // ---- End Intermediate Update ----
 
         --width;
     }
