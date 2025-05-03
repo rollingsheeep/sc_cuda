@@ -384,14 +384,31 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
 
                     minCol = best_col_prev_row; // Update minCol for the next iteration (row r-1)
                 }
-            }      
+            }
+
+            // Intermediate Update: Recalculate energy/score on rank 0
+            // after seam removal, mimicking the OpenMP version's logic
+            int next_width = width - 1;
+            if (next_width > targetWidth) {
+                // Recalculate backward energy (importants) sequentially on rank 0
+                for (int r_update = 0; r_update < height; ++r_update) {
+                    for (int c_update = 0; c_update < next_width; ++c_update) {
+                        gatheredImportants[r_update * originalWidth + c_update] = 
+                            backwardEnergy(grayPixels, r_update, c_update, next_width, height, originalWidth);
+                    }
+                }
+
+                // Recalculate scores sequentially on rank 0 using the updated importants
+                seamsScore(gatheredImportants, score, next_width, height, originalWidth);
+            }
+
             auto seamTracingEnd = std::chrono::high_resolution_clock::now();
             totalSeamTracingTime += std::chrono::duration_cast<std::chrono::microseconds>(seamTracingEnd - seamTracingStart).count() / 1000.0;
         }
 
         // Broadcast updated image and grayscale to all ranks
-        MPI_Bcast(outPixels, (width - 1) * height * sizeof(uchar3), MPI_BYTE, 0, MPI_COMM_WORLD);
-        MPI_Bcast(grayPixels, (width - 1) * height * sizeof(uint8_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+        MPI_Bcast(outPixels, originalWidth * height * sizeof(uchar3), MPI_BYTE, 0, MPI_COMM_WORLD);
+        MPI_Bcast(grayPixels, originalWidth * height * sizeof(uint8_t), MPI_BYTE, 0, MPI_COMM_WORLD);
 
         --width;
     }

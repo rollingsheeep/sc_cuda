@@ -155,7 +155,7 @@ def run_seam_carving(executable, input_file, output_base, num_seams):
             # Use mpiexec for MPI version with 4 processes
             cmd = [
                 "mpiexec",
-                "-n", "4",  # Use 4 processes
+                "-n", "16",  # Use 4 processes
                 executable,
                 input_file,
                 output_base,
@@ -251,9 +251,9 @@ def main():
         try:
             # Prepare the command based on implementation
             if impl == 'mpi':
-                cmd = ["mpiexec", "-n", "4", os.path.join(".", exe_name), temp_ppm, output_ppm, str(num_seams)]
+                cmd = ["mpiexec", "-n", "16", os.path.join(".", exe_name), temp_ppm, output_ppm, str(num_seams)]
             elif impl == 'cuda':
-                cmd = [os.path.join(".", exe_name), temp_ppm, output_ppm, str(num_seams), "16", "16"]
+                cmd = [os.path.join(".", exe_name), temp_ppm, output_ppm, str(num_seams), "4", "4"]
             else:
                 cmd = [os.path.join(".", exe_name), temp_ppm, output_ppm, str(num_seams)]
                 
