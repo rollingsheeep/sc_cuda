@@ -3,350 +3,350 @@
         "Image": "100.pnm",
         "Width": 100,
         "Num_Seams": 25,
-        "Average Time (s)": 0.020753145217895508,
+        "Average Time (s)": 0.05656909942626953,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "200.pnm",
         "Width": 200,
         "Num_Seams": 50,
-        "Average Time (s)": 0.06804966926574707,
+        "Average Time (s)": 0.0810859203338623,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "300.pnm",
         "Width": 300,
         "Num_Seams": 75,
-        "Average Time (s)": 0.19780397415161133,
+        "Average Time (s)": 0.2431502342224121,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "320.pnm",
         "Width": 320,
         "Num_Seams": 80,
-        "Average Time (s)": 0.22713947296142578,
+        "Average Time (s)": 0.3437643051147461,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "340.pnm",
         "Width": 340,
         "Num_Seams": 85,
-        "Average Time (s)": 0.2796967029571533,
+        "Average Time (s)": 0.4033944606781006,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "400.pnm",
         "Width": 400,
         "Num_Seams": 100,
-        "Average Time (s)": 0.38512516021728516,
+        "Average Time (s)": 0.5315461158752441,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "404.pnm",
         "Width": 404,
         "Num_Seams": 101,
-        "Average Time (s)": 0.39487242698669434,
+        "Average Time (s)": 0.5604851245880127,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "440.pnm",
         "Width": 440,
         "Num_Seams": 110,
-        "Average Time (s)": 0.50905442237854,
+        "Average Time (s)": 0.7020959854125977,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "480.pnm",
         "Width": 480,
         "Num_Seams": 120,
-        "Average Time (s)": 0.5212874412536621,
+        "Average Time (s)": 0.7625772953033447,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "500.pnm",
         "Width": 500,
         "Num_Seams": 125,
-        "Average Time (s)": 0.7063837051391602,
+        "Average Time (s)": 1.0083131790161133,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "504.pnm",
         "Width": 504,
         "Num_Seams": 126,
-        "Average Time (s)": 0.7673802375793457,
+        "Average Time (s)": 1.1293573379516602,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "512.pnm",
         "Width": 512,
         "Num_Seams": 128,
-        "Average Time (s)": 0.8506848812103271,
+        "Average Time (s)": 1.2639200687408447,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "520.pnm",
         "Width": 520,
         "Num_Seams": 130,
-        "Average Time (s)": 0.7947578430175781,
+        "Average Time (s)": 1.1946592330932617,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "540.pnm",
         "Width": 540,
         "Num_Seams": 135,
-        "Average Time (s)": 0.8686766624450684,
+        "Average Time (s)": 1.3765873908996582,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "580.pnm",
         "Width": 580,
         "Num_Seams": 145,
-        "Average Time (s)": 1.106064796447754,
+        "Average Time (s)": 1.6481034755706787,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "600.pnm",
         "Width": 600,
         "Num_Seams": 150,
-        "Average Time (s)": 1.1852903366088867,
+        "Average Time (s)": 1.7393772602081299,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "604.pnm",
         "Width": 604,
         "Num_Seams": 151,
-        "Average Time (s)": 1.221259593963623,
+        "Average Time (s)": 1.8255815505981445,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "606.pnm",
         "Width": 606,
         "Num_Seams": 151,
-        "Average Time (s)": 1.1682944297790527,
+        "Average Time (s)": 2.040870189666748,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "608.pnm",
         "Width": 608,
         "Num_Seams": 152,
-        "Average Time (s)": 1.1849937438964844,
+        "Average Time (s)": 2.0697076320648193,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "620.pnm",
         "Width": 620,
         "Num_Seams": 155,
-        "Average Time (s)": 1.316269874572754,
+        "Average Time (s)": 2.0022008419036865,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "640.pnm",
         "Width": 640,
         "Num_Seams": 160,
-        "Average Time (s)": 1.374786138534546,
+        "Average Time (s)": 2.0752201080322266,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "654.pnm",
         "Width": 654,
         "Num_Seams": 163,
-        "Average Time (s)": 1.2898476123809814,
+        "Average Time (s)": 1.956848382949829,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "700.pnm",
         "Width": 700,
         "Num_Seams": 175,
-        "Average Time (s)": 1.8690614700317383,
+        "Average Time (s)": 2.769167900085449,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "728.pnm",
         "Width": 728,
         "Num_Seams": 182,
-        "Average Time (s)": 1.6758766174316406,
+        "Average Time (s)": 2.451335906982422,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "800.pnm",
         "Width": 800,
         "Num_Seams": 200,
-        "Average Time (s)": 2.327244997024536,
+        "Average Time (s)": 3.4834632873535156,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "920.pnm",
         "Width": 920,
         "Num_Seams": 230,
-        "Average Time (s)": 3.980210781097412,
+        "Average Time (s)": 5.947137117385864,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "960.pnm",
         "Width": 960,
         "Num_Seams": 240,
-        "Average Time (s)": 4.602489709854126,
+        "Average Time (s)": 6.868219614028931,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "980.pnm",
         "Width": 980,
         "Num_Seams": 245,
-        "Average Time (s)": 5.011690855026245,
+        "Average Time (s)": 7.459472179412842,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1000.pnm",
         "Width": 1000,
         "Num_Seams": 250,
-        "Average Time (s)": 4.456573963165283,
+        "Average Time (s)": 6.59333062171936,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1040.pnm",
         "Width": 1040,
         "Num_Seams": 260,
-        "Average Time (s)": 6.10363245010376,
+        "Average Time (s)": 9.10824704170227,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1082.pnm",
         "Width": 1082,
         "Num_Seams": 270,
-        "Average Time (s)": 3.340928792953491,
+        "Average Time (s)": 4.864953517913818,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1100.pnm",
         "Width": 1100,
         "Num_Seams": 275,
-        "Average Time (s)": 6.940715074539185,
+        "Average Time (s)": 10.588858366012573,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1140.pnm",
         "Width": 1140,
         "Num_Seams": 285,
-        "Average Time (s)": 6.412828683853149,
+        "Average Time (s)": 9.71933126449585,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1160.pnm",
         "Width": 1160,
         "Num_Seams": 290,
-        "Average Time (s)": 6.868662595748901,
+        "Average Time (s)": 10.419423580169678,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1200.pnm",
         "Width": 1200,
         "Num_Seams": 300,
-        "Average Time (s)": 9.186546087265015,
+        "Average Time (s)": 14.133304119110107,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1240.pnm",
         "Width": 1240,
         "Num_Seams": 310,
-        "Average Time (s)": 8.286882400512695,
+        "Average Time (s)": 12.820989847183228,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1280.pnm",
         "Width": 1280,
         "Num_Seams": 320,
-        "Average Time (s)": 10.216270208358765,
+        "Average Time (s)": 16.081262588500977,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1428.pnm",
         "Width": 1428,
         "Num_Seams": 357,
-        "Average Time (s)": 15.00513243675232,
+        "Average Time (s)": 24.24820566177368,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1440.pnm",
         "Width": 1440,
         "Num_Seams": 360,
-        "Average Time (s)": 14.643316984176636,
+        "Average Time (s)": 23.061094522476196,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1616.pnm",
         "Width": 1616,
         "Num_Seams": 404,
-        "Average Time (s)": 18.41915798187256,
+        "Average Time (s)": 29.085299968719482,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1760.pnm",
         "Width": 1760,
         "Num_Seams": 440,
-        "Average Time (s)": 23.16503667831421,
+        "Average Time (s)": 37.86467218399048,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1900.pnm",
         "Width": 1900,
         "Num_Seams": 475,
-        "Average Time (s)": 29.569857120513916,
+        "Average Time (s)": 47.63751673698425,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "1920.pnm",
         "Width": 1920,
         "Num_Seams": 480,
-        "Average Time (s)": 33.68343758583069,
+        "Average Time (s)": 54.20286321640015,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "2000.pnm",
         "Width": 2000,
         "Num_Seams": 500,
-        "Average Time (s)": 38.79855179786682,
+        "Average Time (s)": 60.4805634021759,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "2120.pnm",
         "Width": 2120,
         "Num_Seams": 530,
-        "Average Time (s)": 49.59442496299744,
+        "Average Time (s)": 78.21824312210083,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "2200.pnm",
         "Width": 2200,
         "Num_Seams": 550,
-        "Average Time (s)": 52.432944536209106,
+        "Average Time (s)": 81.85882544517517,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "2600.pnm",
         "Width": 2600,
         "Num_Seams": 650,
-        "Average Time (s)": 25.831778287887573,
+        "Average Time (s)": 40.8888943195343,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "2880.pnm",
         "Width": 2880,
         "Num_Seams": 720,
-        "Average Time (s)": 98.77506256103516,
+        "Average Time (s)": 163.67886662483215,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "3000.pnm",
         "Width": 3000,
         "Num_Seams": 750,
-        "Average Time (s)": 138.70079922676086,
+        "Average Time (s)": 221.65539979934692,
         "Std Dev (s)": 0.0
     },
     {
         "Image": "3056.pnm",
         "Width": 3056,
         "Num_Seams": 764,
-        "Average Time (s)": 130.43116641044617,
+        "Average Time (s)": 205.5894958972931,
         "Std Dev (s)": 0.0
     }
 ]

@@ -252,6 +252,8 @@ def main():
             # Prepare the command based on implementation
             if impl == 'mpi':
                 cmd = ["mpiexec", "-n", "4", os.path.join(".", exe_name), temp_ppm, output_ppm, str(num_seams)]
+            elif impl == 'cuda':
+                cmd = [os.path.join(".", exe_name), temp_ppm, output_ppm, str(num_seams), "16", "16"]
             else:
                 cmd = [os.path.join(".", exe_name), temp_ppm, output_ppm, str(num_seams)]
                 

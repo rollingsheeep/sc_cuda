@@ -185,16 +185,18 @@ __global__ void backwardEnergyKernel(uint8_t * inPixels, int width, int height, 
             // Handling the case of pixels falling outside the boundary
             int r = (py - 1) + i;
             int c = (px - 1) + j;
+            
+            // Match OpenMP's getClosest function exactly
             if (r < 0) 
                 r = 0;
             else if (r >= height) 
                 r = height - 1;
         
-            if (c < 0) {
+            if (c < 0) 
                 c = 0;
-            } else if (c >= width) {
+            else if (c >= width) 
                 c = width - 1;
-            }
+            
             int sobelIdx = i * 3 + j;
             uint8_t closest = inPixels[r * d_originalWidth + c];
             x += static_cast<int>(closest) * d_xSobel[sobelIdx];
@@ -746,6 +748,7 @@ int main(int argc, char ** argv)
         blockSize.x = atoi(argv[4]);
         blockSize.y = atoi(argv[5]);
     } 
+    printf("Block size: %d x %d\n", blockSize.x, blockSize.y);
     seamCarvingByDevice(inPixels, width, height, targetWidth, outPixels, blockSize);
     printf("Image size after seam carving (new_width x height): %i x %i\n\n", targetWidth, height);
     

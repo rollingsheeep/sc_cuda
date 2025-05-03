@@ -199,9 +199,9 @@ void forwardEnergyLocal(uint8_t *grayPixels, int width, int height, float *energ
             }
 
             // Calculate costs
-            float cU = fabs(right - left);
-            float cL = cU + fabs(up - left);
-            float cR = cU + fabs(up - right);
+            float cU = fabsf(right - left);
+            float cL = cU + fabsf(up - left);
+            float cR = cU + fabsf(up - right);
 
             // Calculate minimum energy from previous row
             float min_energy;
@@ -209,20 +209,20 @@ void forwardEnergyLocal(uint8_t *grayPixels, int width, int height, float *energ
                 // Use halo energy for first row of non-zero ranks
                 min_energy = haloEnergy[c] + cU;
                 if (c > 0) {
-                    min_energy = fmin(min_energy, haloEnergy[c - 1] + cL);
+                    min_energy = fminf(min_energy, haloEnergy[c - 1] + cL);
                 }
                 if (c < width - 1) {
-                    min_energy = fmin(min_energy, haloEnergy[c + 1] + cR);
+                    min_energy = fminf(min_energy, haloEnergy[c + 1] + cR);
                 }
             } else {
                 // Use local energy for other rows
                 int prevRow = (r - 1) * originalWidth;
                 min_energy = energy[prevRow + c] + cU;
                 if (c > 0) {
-                    min_energy = fmin(min_energy, energy[prevRow + c - 1] + cL);
+                    min_energy = fminf(min_energy, energy[prevRow + c - 1] + cL);
                 }
                 if (c < width - 1) {
-                    min_energy = fmin(min_energy, energy[prevRow + c + 1] + cR);
+                    min_energy = fminf(min_energy, energy[prevRow + c + 1] + cR);
                 }
             }
 
@@ -351,9 +351,11 @@ void seamCarvingByMPI(uchar3 *inPixels, int width, int height, int targetWidth, 
             auto seamTracingStart = std::chrono::high_resolution_clock::now();
             int minCol = 0;
             for (int c = 1; c < width; ++c) {
-                if (score[(height - 1) * originalWidth + c] < score[(height - 1) * originalWidth + minCol])
+                if (score[(height - 1) * originalWidth + c] < score[(height - 1) * originalWidth + minCol]) {
                     minCol = c;
+                }
             }
+
             // Remove seam
             for (int r = height - 1; r >= 0; --r) {
                 for (int c = minCol; c < width - 1; ++c) {
