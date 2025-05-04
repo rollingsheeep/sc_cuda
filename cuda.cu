@@ -247,6 +247,11 @@ void trace(int *score, int *leastSignificantPixel, int width, int height, int or
         if (r > 0) {
             int aboveIdx = (r - 1) * originalWidth + minCol;
             int min = score[aboveIdx], minColCpy = minCol;
+            
+            // Exactly match OpenMP's tie-breaking logic:
+            // 1. Try center first
+            // 2. Then try left
+            // 3. Finally try right
             if (minColCpy > 0 && score[aboveIdx - 1] < min) {
                 min = score[aboveIdx - 1];
                 minCol = minColCpy - 1;
@@ -287,20 +292,20 @@ __global__ void seamsScoreKernel(int *importants, int *score, int width, int hei
                 int idx = curRow * d_originalWidth + curCol;
                 int aboveIdx = (curRow - 1) * d_originalWidth + curCol;
 
-                // Handle absolute image boundaries correctly
-                int min_prev_score;
-                if (curCol == 0) {
-                    // Leftmost column: only compare center and right
-                    min_prev_score = min(score[aboveIdx], score[aboveIdx + 1]);
-                } else if (curCol == width - 1) {
-                    // Rightmost column: only compare left and center
-                    min_prev_score = min(score[aboveIdx - 1], score[aboveIdx]);
-                } else {
-                    // Middle columns: compare all three
-                    min_prev_score = min(min(score[aboveIdx - 1], score[aboveIdx]), score[aboveIdx + 1]);
+                // Exactly match OpenMP's logic for finding minimum score
+                int min = score[aboveIdx];  // Start with center
+                
+                // Try left if available
+                if (curCol > 0 && score[aboveIdx - 1] < min) {
+                    min = score[aboveIdx - 1];
+                }
+                
+                // Try right if available
+                if (curCol < width - 1 && score[aboveIdx + 1] < min) {
+                    min = score[aboveIdx + 1];
                 }
 
-                score[idx] = min_prev_score + importants[idx];
+                score[idx] = min + importants[idx];
             }
         }
         __syncthreads();
@@ -328,30 +333,33 @@ __global__ void forwardEnergyKernel(uint8_t *grayPixels, int width, int height, 
         return;
     }
     
-    // Get neighboring pixel values with proper boundary handling like getClosest()
-    int leftCol = max(0, col - 1);
-    int rightCol = min(width - 1, col + 1);
-    int upRow = row - 1; // Simpler since we know row > 0 here
+    // Get neighboring pixel values exactly like OpenMP
+    float left = (col > 0) ? static_cast<float>(grayPixels[idx - 1]) : static_cast<float>(grayPixels[idx]);
+    float right = (col < width - 1) ? static_cast<float>(grayPixels[idx + 1]) : static_cast<float>(grayPixels[idx]);
+    float up = static_cast<float>(grayPixels[idx - d_originalWidth]);
     
-    float left = static_cast<float>(grayPixels[row * d_originalWidth + leftCol]);
-    float right = static_cast<float>(grayPixels[row * d_originalWidth + rightCol]);
-    float up = static_cast<float>(grayPixels[upRow * d_originalWidth + col]);
-    // No need for upLeft/upRight if matching OpenMP exactly
-    // float upLeft = static_cast<float>(grayPixels[upRow * d_originalWidth + leftCol]);
-    // float upRight = static_cast<float>(grayPixels[upRow * d_originalWidth + rightCol]);
+    // Compute directional costs exactly like OpenMP
+    float cU = fabsf(right - left);
+    float cL = cU + fabsf(up - left);
+    float cR = cU + fabsf(up - right);
     
-    // Compute directional costs using floating-point - Match OpenMP formula
-    float cU = fabsf(right - left);  // Cost for going straight up
-    float cL = cU + fabsf(up - left);  // Cost for going up-left (matches OpenMP)
-    float cR = cU + fabsf(up - right);  // Cost for going up-right (matches OpenMP)
+    // Find minimum energy with OpenMP's exact tie-breaking logic
+    float min_energy = energy[idx - d_originalWidth] + cU;  // Start with center
     
-    // Get minimum previous path cost
-    float min_energy = energy[idx - d_originalWidth] + cU; // Cost from pixel directly above
+    // Try left if available
     if (col > 0) {
-        min_energy = fminf(min_energy, energy[idx - d_originalWidth - 1] + cL); // Cost from upper-left
+        float left_energy = energy[idx - d_originalWidth - 1] + cL;
+        if (left_energy < min_energy) {
+            min_energy = left_energy;
+        }
     }
+    
+    // Try right if available
     if (col < width - 1) {
-        min_energy = fminf(min_energy, energy[idx - d_originalWidth + 1] + cR); // Cost from upper-right
+        float right_energy = energy[idx - d_originalWidth + 1] + cR;
+        if (right_energy < min_energy) {
+            min_energy = right_energy;
+        }
     }
     
     energy[idx] = min_energy;
